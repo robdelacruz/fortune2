@@ -1,0 +1,14 @@
+Commands:
+info    show fortune jars
+random  show random fortune (default if no command specified)
+
+
+Switches:
+-j  show fortune jar of selected fortune
+-w  select jar by weight of jar file (jars with more fortunes have higher probability of being selected)
+
+
+Todo features? From unix fortune:
+[-m pattern <cookie>...] print out all fortunes which match pattern in cookie file(s)
+[m% cookie1 n% cookie2] show cookie1 m% of the time, cookie2 n% of the time
+

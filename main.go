@@ -9,6 +9,7 @@ import (
     "database/sql"
     "path/filepath"
     "math/rand"
+    "time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -25,50 +26,113 @@ func main() {
 
     os.Args = os.Args[1:]
 
-    if len(os.Args) == 0 {
-        cmd = "random"
-    } else {
-        cmd = os.Args[0]
-        if cmd == "ingest" || cmd == "random" || cmd == "jars" {
+    cmd = "random"
+    if len(os.Args) > 0 {
+        if os.Args[0] == "ingest" || os.Args[0] == "delete" || os.Args[0] == "info" || os.Args[0] == "random" {
+            cmd = os.Args[0]
             os.Args = os.Args[1:]
-        } else {
-            cmd = "random"
         }
     }
+
+    switches, parms := parseArgs(os.Args)
 
     switch cmd {
     case "ingest":
-        for _, jarfile := range os.Args {
+        for _, jarfile := range parms {
             ingestJarFile(db, jarfile)
         }
-    case "random":
-        if len(os.Args) > 0 {
-            for _, jarname := range os.Args {
-                fortune := randomFortune(db, jarname)
-                fmt.Println(fortune)
-            }
-        } else {
-            tbls := allTables(db)
-            if len(tbls) == 0 {
-                fmt.Println("No jars yet.\n Use 'ingest' to initialize one.")
-                os.Exit(1)
-            }
-
-            jarname := tbls[rand.Intn(len(tbls))]
-            fortune := randomFortune(db, jarname)
-            fmt.Println(fortune)
+    case "delete":
+        for _, jarname := range parms {
+            deleteJar(db, jarname)
         }
-    case "jars":
-        tbls := allTables(db)
-        if len(tbls) == 0 {
-            fmt.Println("No jars yet.\n Use 'ingest' to initialize one.")
+    case "random":
+        if len(allTables(db)) == 0 {
+            fmt.Println("No fortune jars yet.\n Use 'ingest' to initialize one.")
             os.Exit(1)
         }
 
+        var pickJar string
+        if switches["w"] != "" {
+            pickJar = randomJarByWeight(db, parms)
+        } else {
+            pickJar = randomJar(db, parms)
+        }
+        fortune := randomFortune(db, pickJar)
+        if switches["j"] != "" || switches["jar"] != "" {
+            fmt.Printf("(%s)\n", pickJar)
+        }
+        fmt.Println(fortune)
+    case "info":
+        tbls := allTables(db)
+        if len(tbls) == 0 {
+            fmt.Println("No fortune jars yet.\n Use 'ingest' to initialize one.")
+            os.Exit(1)
+        }
+
+        jarNumRows := map[string]int{}
+        var totalRows int
         for _, jarname := range tbls {
-            fmt.Println(jarname)
+            nRows := queryNumRows(db, jarname)
+            jarNumRows[jarname] = nRows
+            totalRows += nRows
+        }
+
+        fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "fortunes", "%")
+        fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 8), strings.Repeat("-", 6))
+        for _, jarname := range tbls {
+            nRows := jarNumRows[jarname]
+            pctTotal := float64(nRows) / float64(totalRows) * 100
+            fmt.Printf("%-20s  %8d  %6.2f\n", jarname, nRows, pctTotal)
         }
     }
+}
+
+func listContains(ss []string, v string) bool {
+    for _, s := range ss {
+        if v == s {
+            return true
+        }
+    }
+    return false
+}
+
+func parseArgs(args []string) (map[string]string, []string) {
+    switches := map[string]string{}
+    parms := []string{}
+
+    standaloneSwitches := []string{"j", "w"}
+    definitionSwitches := []string{}
+	fNoMoreSwitches := false
+	curKey := ""
+
+	for _, arg := range args {
+		if fNoMoreSwitches {
+			// any arg after "--" is a standalone parameter
+			parms = append(parms, arg)
+		} else if arg == "--" {
+			// "--" means no more switches to come
+			fNoMoreSwitches = true
+		} else if strings.HasPrefix(arg, "--") {
+			switches[arg[2:]] = "y"
+			curKey = ""
+		} else if strings.HasPrefix(arg, "-") {
+            if listContains(standaloneSwitches, arg[1:]) {
+                // -j -w
+                switches[arg[1:]] = "y"
+            } else if listContains(definitionSwitches, arg[1:]) {
+                // -key "val"
+                curKey = arg[1:]
+            }
+		} else if curKey != "" {
+			switches[curKey] = arg
+			curKey = ""
+		} else {
+			// standalone parameter
+			parms = append(parms, arg)
+		}
+	}
+
+	return switches, parms
 }
 
 func ingestJarFile(db *sql.DB, jarfile string) {
@@ -125,6 +189,73 @@ func ingestJarFile(db *sql.DB, jarfile string) {
     fmt.Printf("Done.\n")
 }
 
+func deleteJar(db *sql.DB, jarname string) {
+    var err error
+    var sqlstr string
+
+    _, err = db.Exec("BEGIN TRANSACTION")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Deleting jar '%s'...", jarname)
+    sqlstr = fmt.Sprintf("DROP TABLE IF EXISTS [%s]", jarname)
+    _, err = db.Exec(sqlstr)
+
+    _, err = db.Exec("COMMIT")
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Done.\n")
+}
+
+func randomJar(db *sql.DB, jarnames []string) string {
+    rand.Seed(time.Now().UnixNano())
+
+    if len(jarnames) == 0 {
+        jarnames = allTables(db)
+    }
+
+    return jarnames[rand.Intn(len(jarnames))]
+}
+
+func randomJarByWeight(db *sql.DB, jarnames []string) string {
+    rand.Seed(time.Now().UnixNano())
+
+    if len(jarnames) == 0 {
+        jarnames = allTables(db)
+    }
+
+    jarNumRows := map[string]int{}
+    var totalRows int
+    for _, jarname := range jarnames {
+        nRows := queryNumRows(db, jarname)
+        jarNumRows[jarname] = nRows
+        totalRows += nRows
+    }
+
+    // None of the jarnames exist, so just select from all jars.
+    if totalRows == 0 {
+        return randomJar(db, allTables(db))
+    }
+
+    npick := rand.Intn(totalRows)
+
+    var pickJar string
+    var sumRows int
+    for _, jarname := range jarnames {
+        sumRows += jarNumRows[jarname]
+        if npick < sumRows {
+            pickJar = jarname
+            break
+        }
+    }
+    if pickJar == "" {
+        log.Fatalf("No jar was picked. totalRows=%d npick=%d", totalRows, npick)
+    }
+    return pickJar
+}
+
 func randomFortune(db *sql.DB, jarname string) string {
     var body string
     var err error
@@ -155,3 +286,17 @@ func allTables(db *sql.DB) []string {
 	}
 	return tbls
 }
+
+func queryNumRows(db *sql.DB, jarname string) int {
+    var rowid int
+    var err error
+
+    sqlstr := fmt.Sprintf("SELECT max(rowid) FROM [%s]", jarname)
+    row := db.QueryRow(sqlstr)
+    err = row.Scan(&rowid)
+    if err == sql.ErrNoRows {
+        log.Fatal(err)
+    }
+    return rowid
+}
+
