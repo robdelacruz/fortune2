@@ -19,7 +19,14 @@ func main() {
     var err error
     var cmd string
 
-    db, err = sql.Open("sqlite3", "./fortune.db")
+    // Use $FORTUNE2FILE or /usr/local/share/fortune2/fortune2.db if env var not defined.
+    fortunefile := os.Getenv("FORTUNE2FILE")
+    if fortunefile == "" {
+        dirpath := filepath.Join(string(os.PathSeparator), "usr", "local", "share", "fortune2")
+        os.MkdirAll(dirpath, os.ModePerm)
+        fortunefile = filepath.Join(dirpath, "fortune2.db")
+    }
+    db, err = sql.Open("sqlite3", fortunefile)
     if err != nil {
         log.Fatal(err)
     }
@@ -63,6 +70,7 @@ func main() {
         }
         fmt.Println(fortune)
     case "info":
+        fmt.Printf("fortune db file:  %s\n\n", fortunefile)
         tbls := allTables(db)
         if len(tbls) == 0 {
             fmt.Println("No fortune jars yet.\n Use 'ingest' to initialize one.")
@@ -156,11 +164,21 @@ func ingestJarFile(db *sql.DB, jarfile string) {
 
     sql = fmt.Sprintf("DROP TABLE IF EXISTS [%s]", jarname)
     _, err = db.Exec(sql)
+    if err != nil {
+        panic(err)
+        log.Fatal(err)
+    }
     sql = fmt.Sprintf("CREATE TABLE [%s] (id INTEGER PRIMARY KEY NOT NULL, body TEXT)", jarname)
     _, err = db.Exec(sql)
+    if err != nil {
+        log.Fatal(err)
+    }
 
     sql = fmt.Sprintf("INSERT INTO [%s] (body) VALUES (?)", jarname)
-    insertStmt, _ := db.Prepare(sql)
+    insertStmt, err := db.Prepare(sql)
+    if err != nil {
+        log.Fatal(err)
+    }
 
     scanner := bufio.NewScanner(f)
     for scanner.Scan() {
@@ -169,6 +187,9 @@ func ingestJarFile(db *sql.DB, jarfile string) {
             body = sb.String()
             if len(strings.TrimSpace(body)) > 0 {
                 _, err = insertStmt.Exec(body)
+                if err != nil {
+                    log.Fatal(err)
+                }
             }
             sb.Reset()
             continue
@@ -180,6 +201,9 @@ func ingestJarFile(db *sql.DB, jarfile string) {
     body = sb.String()
     if len(strings.TrimSpace(body)) > 0 {
         _, err = insertStmt.Exec(body)
+        if err != nil {
+            log.Fatal(err)
+        }
     }
 
     _, err = db.Exec("COMMIT")
