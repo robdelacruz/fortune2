@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"html"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +38,7 @@ func main() {
 
 	cmd = "random"
 	if len(os.Args) > 0 {
-		if os.Args[0] == "ingest" || os.Args[0] == "delete" || os.Args[0] == "info" || os.Args[0] == "random" {
+		if os.Args[0] == "ingest" || os.Args[0] == "delete" || os.Args[0] == "info" || os.Args[0] == "random" || os.Args[0] == "serve" {
 			cmd = os.Args[0]
 			os.Args = os.Args[1:]
 		}
@@ -45,31 +47,6 @@ func main() {
 	switches, parms := parseArgs(os.Args)
 
 	switch cmd {
-	case "ingest":
-		for _, jarfile := range parms {
-			ingestJarFile(db, jarfile)
-		}
-	case "delete":
-		for _, jarname := range parms {
-			deleteJar(db, jarname)
-		}
-	case "random":
-		if len(allTables(db)) == 0 {
-			fmt.Println("No fortune jars yet.\n Use 'ingest' to initialize one.")
-			os.Exit(1)
-		}
-
-		var pickJar string
-		if switches["w"] != "" {
-			pickJar = randomJarByWeight(db, parms)
-		} else {
-			pickJar = randomJar(db, parms)
-		}
-		fortune := randomFortune(db, pickJar)
-		if switches["j"] != "" || switches["jar"] != "" {
-			fmt.Printf("(%s)\n", pickJar)
-		}
-		fmt.Println(fortune)
 	case "info":
 		fmt.Printf("fortune db file:  %s\n\n", fortunefile)
 		tbls := allTables(db)
@@ -93,6 +70,57 @@ func main() {
 			pctTotal := float64(nRows) / float64(totalRows) * 100
 			fmt.Printf("%-20s  %8d  %6.2f\n", jarname, nRows, pctTotal)
 		}
+	case "ingest":
+		for _, jarfile := range parms {
+			ingestJarFile(db, jarfile)
+		}
+	case "delete":
+		for _, jarname := range parms {
+			deleteJar(db, jarname)
+		}
+	case "random":
+		if len(allTables(db)) == 0 {
+			fmt.Println("No fortune jars yet.\n Use 'ingest' to initialize one.")
+			os.Exit(1)
+		}
+
+		var pickJar string
+		if switches["w"] != "" {
+			pickJar = randomJarByWeight(db, parms)
+		} else {
+			pickJar = randomJar(db, parms)
+		}
+		fortune := randomFortune(db, pickJar)
+		if switches["j"] != "" || switches["jarname"] != "" {
+			fmt.Printf("(%s)\n", pickJar)
+		}
+		fmt.Println(fortune)
+	case "serve":
+		fmt.Printf("Listening on 8000...\n")
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			r.ParseForm()
+			sw := r.FormValue("sw")
+			qjars := r.FormValue("jars")
+
+			var jarnames []string
+			if qjars != "" {
+				jarnames = strings.Split(r.FormValue("jars"), ",")
+			}
+
+			var pickJar string
+			if strings.ContainsAny(sw, "w") {
+				pickJar = randomJarByWeight(db, jarnames)
+			} else {
+				pickJar = randomJar(db, jarnames)
+			}
+			fortune := randomFortune(db, pickJar)
+			if strings.ContainsAny(sw, "j") {
+				fmt.Fprintf(w, "(%s)\n", pickJar)
+			}
+			fmt.Fprintln(w, html.EscapeString(fortune))
+		})
+		err = http.ListenAndServe(":8000", nil)
+		log.Fatal(err)
 	}
 }
 
