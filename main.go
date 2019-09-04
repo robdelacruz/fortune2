@@ -85,13 +85,13 @@ func main() {
 		}
 
 		var pickJar string
-		if switches["w"] != "" {
-			pickJar = randomJarByWeight(db, parms)
-		} else {
+		if switches["e"] != "" {
 			pickJar = randomJar(db, parms)
+		} else {
+			pickJar = randomJarByWeight(db, parms)
 		}
 		fortune := randomFortune(db, pickJar)
-		if switches["j"] != "" || switches["jarname"] != "" {
+		if switches["c"] != "" {
 			fmt.Printf("(%s)\n", pickJar)
 		}
 		fmt.Println(fortune)
@@ -137,7 +137,7 @@ func parseArgs(args []string) (map[string]string, []string) {
 	switches := map[string]string{}
 	parms := []string{}
 
-	standaloneSwitches := []string{"j", "w"}
+	standaloneSwitches := []string{"c", "e"}
 	definitionSwitches := []string{}
 	fNoMoreSwitches := false
 	curKey := ""
@@ -153,12 +153,17 @@ func parseArgs(args []string) (map[string]string, []string) {
 			switches[arg[2:]] = "y"
 			curKey = ""
 		} else if strings.HasPrefix(arg, "-") {
-			if listContains(standaloneSwitches, arg[1:]) {
-				// -j -w
-				switches[arg[1:]] = "y"
-			} else if listContains(definitionSwitches, arg[1:]) {
-				// -key "val"
+			if listContains(definitionSwitches, arg[1:]) {
+				// -a "val"
 				curKey = arg[1:]
+				continue
+			}
+			for _, ch := range arg[1:] {
+				// -a, -b, -ab
+				sch := string(ch)
+				if listContains(standaloneSwitches, sch) {
+					switches[sch] = "y"
+				}
 			}
 		} else if curKey != "" {
 			switches[curKey] = arg
