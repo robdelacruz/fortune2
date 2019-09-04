@@ -20,10 +20,21 @@ func main() {
 	var db *sql.DB
 	var err error
 	var cmd string
+	var fortunefile string
 
-	// Use $FORTUNE2FILE or /usr/local/share/fortune2/fortune2.db if env var not defined.
-	//
-	fortunefile := os.Getenv("FORTUNE2FILE")
+	os.Args = os.Args[1:]
+
+	switches, parms := parseArgs(os.Args)
+
+	// fortune db file is read from the following, in order of priority:
+	// 1. -F fortune_file switch
+	// 2. $FORTUNE2FILE env var
+	// 3. /usr/local/share/fortune2/fortune2.db (default)
+	if switches["F"] != "" {
+		fortunefile = switches["F"]
+	} else {
+		fortunefile = os.Getenv("FORTUNE2FILE")
+	}
 	if fortunefile == "" {
 		dirpath := filepath.Join(string(os.PathSeparator), "usr", "local", "share", "fortune2")
 		os.MkdirAll(dirpath, os.ModePerm)
@@ -34,17 +45,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	os.Args = os.Args[1:]
-
 	cmd = "random"
-	if len(os.Args) > 0 {
-		if os.Args[0] == "ingest" || os.Args[0] == "delete" || os.Args[0] == "info" || os.Args[0] == "random" || os.Args[0] == "serve" {
-			cmd = os.Args[0]
-			os.Args = os.Args[1:]
+	if len(parms) > 0 {
+		if parms[0] == "ingest" || parms[0] == "delete" || parms[0] == "info" || parms[0] == "random" || parms[0] == "serve" {
+			cmd = parms[0]
+			parms = parms[1:]
 		}
 	}
-
-	switches, parms := parseArgs(os.Args)
 
 	switch cmd {
 	case "info":
@@ -129,7 +136,7 @@ func parseArgs(args []string) (map[string]string, []string) {
 	parms := []string{}
 
 	standaloneSwitches := []string{"c", "e", "f"}
-	definitionSwitches := []string{}
+	definitionSwitches := []string{"F"}
 	fNoMoreSwitches := false
 	curKey := ""
 
