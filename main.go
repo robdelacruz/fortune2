@@ -55,21 +55,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		jarNumRows := map[string]int{}
-		var totalRows int
-		for _, jarname := range tbls {
-			nRows := queryNumRows(db, jarname)
-			jarNumRows[jarname] = nRows
-			totalRows += nRows
-		}
-
-		fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "fortunes", "%")
-		fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 8), strings.Repeat("-", 6))
-		for _, jarname := range tbls {
-			nRows := jarNumRows[jarname]
-			pctTotal := float64(nRows) / float64(totalRows) * 100
-			fmt.Printf("%-20s  %8d  %6.2f\n", jarname, nRows, pctTotal)
-		}
+		printJarStats(db, tbls)
 	case "ingest":
 		for _, jarfile := range parms {
 			ingestJarFile(db, jarfile)
@@ -82,6 +68,11 @@ func main() {
 		if len(allTables(db)) == 0 {
 			fmt.Println("No fortune jars yet.\n Use 'ingest' to initialize one.")
 			os.Exit(1)
+		}
+
+		if switches["f"] != "" {
+			printJarStats(db, parms)
+			break
 		}
 
 		var pickJar string
@@ -137,7 +128,7 @@ func parseArgs(args []string) (map[string]string, []string) {
 	switches := map[string]string{}
 	parms := []string{}
 
-	standaloneSwitches := []string{"c", "e"}
+	standaloneSwitches := []string{"c", "e", "f"}
 	definitionSwitches := []string{}
 	fNoMoreSwitches := false
 	curKey := ""
@@ -175,6 +166,31 @@ func parseArgs(args []string) (map[string]string, []string) {
 	}
 
 	return switches, parms
+}
+
+func printJarStats(db *sql.DB, jarnames []string) {
+	if len(jarnames) == 0 {
+		jarnames = allTables(db)
+	}
+
+	jarNumRows := map[string]int{}
+	var totalRows int
+	for _, jarname := range jarnames {
+		nRows := queryNumRows(db, jarname)
+		jarNumRows[jarname] = nRows
+		totalRows += nRows
+	}
+
+	fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "fortunes", "%")
+	fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 8), strings.Repeat("-", 6))
+	for _, jarname := range jarnames {
+		nRows := jarNumRows[jarname]
+		pctTotal := 0.0
+		if totalRows > 0 {
+			pctTotal = float64(nRows) / float64(totalRows) * 100
+		}
+		fmt.Printf("%-20s  %8d  %6.2f\n", jarname, nRows, pctTotal)
+	}
 }
 
 func ingestJarFile(db *sql.DB, jarfile string) {
