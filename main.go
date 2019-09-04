@@ -108,13 +108,13 @@ func main() {
 			}
 
 			var pickJar string
-			if strings.ContainsAny(sw, "w") {
-				pickJar = randomJarByWeight(db, jarnames)
-			} else {
+			if strings.ContainsAny(sw, "e") {
 				pickJar = randomJar(db, jarnames)
+			} else {
+				pickJar = randomJarByWeight(db, jarnames)
 			}
 			fortune := randomFortune(db, pickJar)
-			if strings.ContainsAny(sw, "j") {
+			if strings.ContainsAny(sw, "c") {
 				fmt.Fprintf(w, "(%s)\n", pickJar)
 			}
 			fmt.Fprintln(w, html.EscapeString(fortune))
