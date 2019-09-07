@@ -1,15 +1,17 @@
 Commands:
 info    show fortune jars
 random  show random fortune (default if no command specified)
-
+ingest  import fortune jar into db
+delete  delete jar from db
+search  regex search
 
 Switches:
--j  show fortune jar of selected fortune
--w  select jar by weight of jar file (jars with more fortunes have higher probability of being selected)
-
+-c  show fortune jar from which the fortune came.
+-e  consider all fortune jars to be of equal size (by default, larger jars have higher probability of being selected).
+-f  print out list of jars which would be searched, but don't print the fortune.
+-i  ignore case in search
 
 Todo features? From unix fortune:
-[-m pattern <cookie>...] print out all fortunes which match pattern in cookie file(s)
 [m% cookie1 n% cookie2] show cookie1 m% of the time, cookie2 n% of the time
 
 /usr/local/share/fortune2 dir should be writeable (chmod a+w fortune2)

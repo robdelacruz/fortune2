@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -47,7 +49,7 @@ func main() {
 
 	cmd = "random"
 	if len(parms) > 0 {
-		if parms[0] == "ingest" || parms[0] == "delete" || parms[0] == "info" || parms[0] == "random" || parms[0] == "serve" {
+		if parms[0] == "ingest" || parms[0] == "delete" || parms[0] == "search" || parms[0] == "info" || parms[0] == "random" || parms[0] == "serve" {
 			cmd = parms[0]
 			parms = parms[1:]
 		}
@@ -70,6 +72,21 @@ func main() {
 	case "delete":
 		for _, jarname := range parms {
 			deleteJar(db, jarname)
+		}
+	case "search":
+		var q string
+		var jarnames []string
+
+		if len(parms) > 0 {
+			q = parms[0]
+			parms = parms[1:]
+			jarnames = parms
+		}
+		if len(jarnames) == 0 {
+			jarnames = allTables(db)
+		}
+		for _, jarname := range jarnames {
+			allFortunes(db, jarname, q, switches, os.Stdout)
 		}
 	case "random":
 		if len(allTables(db)) == 0 {
@@ -135,7 +152,7 @@ func parseArgs(args []string) (map[string]string, []string) {
 	switches := map[string]string{}
 	parms := []string{}
 
-	standaloneSwitches := []string{"c", "e", "f"}
+	standaloneSwitches := []string{"c", "e", "f", "i"}
 	definitionSwitches := []string{"F"}
 	fNoMoreSwitches := false
 	curKey := ""
@@ -350,13 +367,52 @@ func randomFortune(db *sql.DB, jarname string) string {
 	return body
 }
 
+func allFortunes(db *sql.DB, jarname string, q string, switches map[string]string, w io.Writer) {
+	var body string
+	var err error
+	var re *regexp.Regexp
+	bufw := bufio.NewWriter(w)
+
+	// -i  ignore case
+	if switches["i"] != "" {
+		re = regexp.MustCompile("(?i)" + q)
+	} else {
+		re = regexp.MustCompile(q)
+	}
+
+	sqlstr := fmt.Sprintf("SELECT body FROM [%s]", jarname)
+	rows, err := db.Query(sqlstr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for rows.Next() {
+		err = rows.Scan(&body)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if !re.MatchString(body) {
+			continue
+		}
+		_, err = bufw.WriteString(body)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Make sure the "%" starts on a newline.
+		if !strings.HasSuffix(body, "\n") {
+			bufw.WriteString("\n")
+		}
+		bufw.WriteString("%\n")
+	}
+	bufw.Flush()
+}
+
 func allTables(db *sql.DB) []string {
 	tbls := []string{}
 	rows, err := db.Query(`SELECT DISTINCT tbl_name FROM sqlite_master ORDER BY tbl_name`)
 	if err != nil {
-		return tbls
+		log.Fatal(err)
 	}
-
 	for rows.Next() {
 		var tbl string
 		err := rows.Scan(&tbl)
