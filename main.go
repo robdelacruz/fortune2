@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
-	"html"
 	"io"
 	"log"
 	"math/rand"
@@ -32,10 +31,9 @@ func main() {
 	// 1. -F fortune_file switch
 	// 2. $FORTUNE2FILE env var
 	// 3. /usr/local/share/fortune2/fortune2.db (default)
+	fortunefile = os.Getenv("FORTUNE2FILE")
 	if switches["F"] != "" {
 		fortunefile = switches["F"]
-	} else {
-		fortunefile = os.Getenv("FORTUNE2FILE")
 	}
 	if fortunefile == "" {
 		dirpath := filepath.Join(string(os.PathSeparator), "usr", "local", "share", "fortune2")
@@ -99,17 +97,15 @@ func main() {
 			break
 		}
 
-		var pickJar string
+		pickJarFunc := randomJarByWeight
 		if switches["e"] != "" {
-			pickJar = randomJar(db, parms)
-		} else {
-			pickJar = randomJarByWeight(db, parms)
+			pickJarFunc = randomJar
 		}
-		fortune := randomFortune(db, pickJar)
+		jarname := pickJarFunc(db, parms)
 		if switches["c"] != "" {
-			fmt.Printf("(%s)\n", pickJar)
+			fmt.Printf("(%s)\n", jarname)
 		}
-		fmt.Println(fortune)
+		fmt.Println(randomFortune(db, jarname))
 	case "serve":
 		fmt.Printf("Listening on 8000...\n")
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -117,22 +113,20 @@ func main() {
 			sw := r.FormValue("sw")
 			qjars := r.FormValue("jars")
 
-			var jarnames []string
+			jarnames := []string{}
 			if qjars != "" {
 				jarnames = strings.Split(r.FormValue("jars"), ",")
 			}
 
-			var pickJar string
+			pickJarFunc := randomJarByWeight
 			if strings.ContainsAny(sw, "e") {
-				pickJar = randomJar(db, jarnames)
-			} else {
-				pickJar = randomJarByWeight(db, jarnames)
+				pickJarFunc = randomJar
 			}
-			fortune := randomFortune(db, pickJar)
+			jarname := pickJarFunc(db, jarnames)
 			if strings.ContainsAny(sw, "c") {
-				fmt.Fprintf(w, "(%s)\n", pickJar)
+				fmt.Fprintf(w, "(%s)\n", jarname)
 			}
-			fmt.Fprintln(w, html.EscapeString(fortune))
+			fmt.Fprintln(w, randomFortune(db, jarname))
 		})
 		err = http.ListenAndServe(":8000", nil)
 		log.Fatal(err)
@@ -239,7 +233,6 @@ func ingestJarFile(db *sql.DB, jarfile string) {
 	sql = fmt.Sprintf("DROP TABLE IF EXISTS [%s]", jarname)
 	_, err = db.Exec(sql)
 	if err != nil {
-		panic(err)
 		log.Fatal(err)
 	}
 	sql = fmt.Sprintf("CREATE TABLE [%s] (id INTEGER PRIMARY KEY NOT NULL, body TEXT)", jarname)
@@ -259,13 +252,14 @@ func ingestJarFile(db *sql.DB, jarfile string) {
 		line := scanner.Text()
 		if strings.TrimSpace(line) == "%" {
 			body = sb.String()
-			if len(strings.TrimSpace(body)) > 0 {
-				_, err = insertStmt.Exec(body)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
 			sb.Reset()
+			if len(strings.TrimSpace(body)) == 0 {
+				continue
+			}
+			_, err = insertStmt.Exec(body)
+			if err != nil {
+				log.Fatal(err)
+			}
 			continue
 		}
 
@@ -373,12 +367,12 @@ func allFortunes(db *sql.DB, jarname string, q string, switches map[string]strin
 	var re *regexp.Regexp
 	bufw := bufio.NewWriter(w)
 
+	sre := q
 	// -i  ignore case
 	if switches["i"] != "" {
-		re = regexp.MustCompile("(?i)" + q)
-	} else {
-		re = regexp.MustCompile(q)
+		sre = "(?i)" + q
 	}
+	re = regexp.MustCompile(sre)
 
 	sqlstr := fmt.Sprintf("SELECT body FROM [%s]", jarname)
 	rows, err := db.Query(sqlstr)
