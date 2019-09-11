@@ -17,6 +17,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+type FortuneFmt int
+
+const (
+	PlainText = FortuneFmt(iota)
+	Html
+	Json
+)
+
 func main() {
 	var db *sql.DB
 	var err error
@@ -112,6 +120,15 @@ func main() {
 			r.ParseForm()
 			sw := r.FormValue("sw")
 			qjars := r.FormValue("jars")
+			outputfmt := r.FormValue("outputfmt")
+
+			fortfmt := PlainText
+			switch outputfmt {
+			case "html":
+				fortfmt = Html
+			case "json":
+				fortfmt = Json
+			}
 
 			jarnames := []string{}
 			if qjars != "" {
@@ -122,11 +139,28 @@ func main() {
 			if strings.ContainsAny(sw, "e") {
 				pickJarFunc = randomJar
 			}
+
 			jarname := pickJarFunc(db, jarnames)
-			if strings.ContainsAny(sw, "c") {
-				fmt.Fprintf(w, "(%s)\n", jarname)
+			fortune := randomFortune(db, jarname)
+
+			switch fortfmt {
+			case PlainText:
+				if strings.ContainsAny(sw, "c") {
+					fmt.Fprintf(w, "(%s)\n", jarname)
+				}
+				fmt.Fprintf(w, fortune)
+				fmt.Fprintf(w, "\n")
+			case Html:
+				fmt.Fprintf(w, "<article>\n")
+				fmt.Fprintf(w, "<pre>\n")
+				if strings.ContainsAny(sw, "c") {
+					fmt.Fprintf(w, "(%s)\n", jarname)
+				}
+				fmt.Fprintf(w, fortune)
+				fmt.Fprintf(w, "</pre>\n")
+				fmt.Fprintf(w, "</article>\n")
 			}
-			fmt.Fprintln(w, randomFortune(db, jarname))
+
 		})
 		err = http.ListenAndServe(":8000", nil)
 		log.Fatal(err)
