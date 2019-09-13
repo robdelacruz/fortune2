@@ -1,0 +1,38 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fortune2 test page</title>
+<style>
+</style>
+</head>
+<body>
+<h1>fortune2 test page</h1>
+<form>
+    <button id="get_fortune">Get Fortune</button>
+</form>
+
+<script>
+const fortune2_url = "/?sw=c";
+const get_fortune = document.querySelector("#get_fortune");
+const xhr = new XMLHttpRequest();
+
+document.addEventListener("click", function(e) {
+    e.preventDefault();
+    console.log('get fortune click');
+
+    xhr.open("GET", fortune2_url);
+    xhr.onload = function() {
+        if (xhr.status == 200) {
+            console.log(xhr.responseText);
+        } else {
+            console.log(`xhr error: {xhr.status}`);
+        }
+    };
+    xhr.send("sw=c");
+
+});
+</script>
+</body>
+</html>

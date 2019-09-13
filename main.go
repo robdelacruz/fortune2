@@ -116,7 +116,12 @@ func main() {
 		}
 		fmt.Println(randomFortune(db, jarname))
 	case "serve":
-		fmt.Printf("Listening on 8000...\n")
+		port := "8000"
+		if len(parms) > 0 {
+			port = parms[0]
+		}
+		fmt.Printf("Listening on %s...\n", port)
+		http.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public"))))
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			r.ParseForm()
 			sw := r.FormValue("sw")
@@ -175,7 +180,7 @@ func main() {
 			}
 
 		})
-		err = http.ListenAndServe(":8000", nil)
+		err = http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 		log.Fatal(err)
 	}
 }
