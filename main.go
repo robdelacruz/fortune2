@@ -21,6 +21,7 @@ type FortuneFmt int
 
 const (
 	PlainText = FortuneFmt(iota)
+	HtmlPre
 	Html
 	Json
 )
@@ -122,12 +123,14 @@ func main() {
 			qjars := r.FormValue("jars")
 			outputfmt := r.FormValue("outputfmt")
 
-			fortfmt := PlainText
+			format := PlainText
 			switch outputfmt {
+			case "htmlpre":
+				format = HtmlPre
 			case "html":
-				fortfmt = Html
+				format = Html
 			case "json":
-				fortfmt = Json
+				format = Json
 			}
 
 			jarnames := []string{}
@@ -143,14 +146,14 @@ func main() {
 			jarname := pickJarFunc(db, jarnames)
 			fortune := randomFortune(db, jarname)
 
-			switch fortfmt {
+			switch format {
 			case PlainText:
 				if strings.ContainsAny(sw, "c") {
 					fmt.Fprintf(w, "(%s)\n", jarname)
 				}
 				fmt.Fprintf(w, fortune)
 				fmt.Fprintf(w, "\n")
-			case Html:
+			case HtmlPre:
 				fmt.Fprintf(w, "<article>\n")
 				fmt.Fprintf(w, "<pre>\n")
 				if strings.ContainsAny(sw, "c") {
@@ -158,6 +161,16 @@ func main() {
 				}
 				fmt.Fprintf(w, fortune)
 				fmt.Fprintf(w, "</pre>\n")
+				fmt.Fprintf(w, "</article>\n")
+			case Html:
+				fmt.Fprintf(w, "<article>\n")
+				if strings.ContainsAny(sw, "c") {
+					fmt.Fprintf(w, "<p>(%s)</p>\n", jarname)
+				}
+				lines := strings.Split(strings.TrimSpace(fortune), "\n")
+				for _, line := range lines {
+					fmt.Fprintf(w, "<p>%s</p>\n", line)
+				}
 				fmt.Fprintf(w, "</article>\n")
 			}
 
