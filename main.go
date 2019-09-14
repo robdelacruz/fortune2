@@ -121,7 +121,7 @@ func main() {
 			port = parms[0]
 		}
 		fmt.Printf("Listening on %s...\n", port)
-		http.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public"))))
+		http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("./web"))))
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			r.ParseForm()
 			sw := r.FormValue("sw")
