@@ -3,6 +3,9 @@ BINDIR=/usr/local/bin
 
 all: fortune2
 
+dep:
+	go get -u github.com/mattn/go-sqlite3
+
 fortune2: main.go
 	go build -o fortune2 main.go
 
@@ -19,4 +22,7 @@ install: fortune2
 uninstall:
 	rm -rf $(SHAREDIR)
 	rm -rf $(BINDIR)/fortune2
+
+install_fortunes:
+	fortune2 ingest fortunes/*
 
