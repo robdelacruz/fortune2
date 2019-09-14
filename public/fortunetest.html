@@ -23,7 +23,10 @@ document.addEventListener("click", function(e) {
     console.log('get fortune click');
 
     xhr.open("GET", fortune2_url);
-    xhr.onload = function() {
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState != 4) {
+            return;
+        }
         if (xhr.status == 200) {
             console.log(xhr.responseText);
         } else {
