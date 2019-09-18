@@ -128,15 +128,23 @@ func main() {
 			qjars := r.FormValue("jars")
 			outputfmt := r.FormValue("outputfmt")
 
+			// Allow requests from all sites.
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+
 			format := PlainText
+			contentType := "text/plain"
 			switch outputfmt {
 			case "htmlpre":
 				format = HtmlPre
+				contentType = "text/html"
 			case "html":
 				format = Html
+				contentType = "text/html"
 			case "json":
 				format = Json
+				contentType = "application/json"
 			}
+			w.Header().Set("Content-Type", contentType)
 
 			jarnames := []string{}
 			if qjars != "" {
