@@ -6,7 +6,7 @@
 <title>fortune2 test page</title>
 <style>
 body { margin: 0 auto; width: 50% }
-#fortune_container { padding: 20px; border: 1px dotted; }
+.fortune { padding: 20px; border: 1px dotted; }
 #new_fortune { margin: 20px 0; }
 </style>
 </head>
@@ -16,7 +16,8 @@ body { margin: 0 auto; width: 50% }
 <div id="fortune_container"></div>
 
 <script>
-const fortune2_url = "/?sw=c";
+//const fortune2_url = "/?sw=c";
+const fortune2_url = "/?sw=c&outputfmt=html";
 const get_fortune = document.querySelector("#new_fortune");
 const fortune_container = document.querySelector("#fortune_container");
 const xhr = new XMLHttpRequest();
@@ -33,10 +34,10 @@ function show_fortune() {
             console.log(`xhr error: {xhr.status}`);
         }
     };
-    xhr.send("sw=c&outputfmt=html");
+    xhr.send();
 }
 
-document.addEventListener("click", function(e) {
+get_fortune.addEventListener("click", function(e) {
     e.preventDefault();
     show_fortune();
 });

@@ -176,13 +176,13 @@ func main() {
 				fmt.Fprintf(w, "</pre>\n")
 				fmt.Fprintf(w, "</article>\n")
 			case Html:
-				fmt.Fprintf(w, "<article>\n")
+				fmt.Fprintf(w, "<article class=\"fortune\">\n")
 				if strings.ContainsAny(sw, "c") {
-					fmt.Fprintf(w, "<p>(%s)</p>\n", jarname)
+					fmt.Fprintf(w, "(%s)<br>\n", jarname)
 				}
 				lines := strings.Split(strings.TrimSpace(fortune), "\n")
 				for _, line := range lines {
-					fmt.Fprintf(w, "<p>%s</p>\n", line)
+					fmt.Fprintf(w, "%s<br>\n", line)
 				}
 				fmt.Fprintf(w, "</article>\n")
 			}
