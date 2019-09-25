@@ -6,9 +6,9 @@ delete  delete jar from db
 search  regex search
 
 Switches:
--c  show fortune jar from which the fortune came.
--e  consider all fortune jars to be of equal size (by default, larger jars have higher probability of being selected).
--f  print out list of jars which would be searched, but don't print the fortune.
+-c  show cookie-jar from which the fortune came.
+-e  consider all cookie-jars to be of equal size (by default, larger jars have higher probability of being selected).
+-f  print out list of cookie-jars which would be searched, but don't print the fortune.
 -i  ignore case in search
 
 Todo features? From unix fortune:
@@ -16,4 +16,34 @@ Todo features? From unix fortune:
 
 /usr/local/share/fortune2 dir should be writeable (chmod a+w fortune2)
 fortune2.db should be writeable (chmod a+w fortune2.db)
+
+test website
+------------
+/fortuneweb                   (show random fortune)
+/fortuneweb/<cookie-jar>      (show random fortune from <cookie-jar>
+/fortuneweb/<cookie-jar>/<n>  (show <cookie-jar> fortune #n)
+
+Ex.
+/fortuneweb
+/fortuneweb/men-women
+/fortuneweb/men-women/1
+
+api
+---
+outputfmt=html|htmlpre|json
+sw=[ce]
+jar=<cookie-jar-1>,<cookie-jar-2>,...
+/fortune
+/fortune/<cookie-jar>
+/fortune/<cookie-jar>/<n>
+
+Ex.
+/fortune?outputfmt=json&sw=c
+/fortune?jar=men-women,perl,news
+/fortune/men-women
+/fortune/men-women/2
+
+help/about
+----------
+/    (show html help page showing samples and links)
 
