@@ -77,23 +77,23 @@ func main() {
 			ingestJarFile(db, jarfile)
 		}
 	case "delete":
-		for _, jarname := range parms {
-			deleteJar(db, jarname)
+		for _, jar := range parms {
+			deleteJar(db, jar)
 		}
 	case "search":
 		var q string
-		var jarnames []string
+		var jars []string
 
 		if len(parms) > 0 {
 			q = parms[0]
 			parms = parms[1:]
-			jarnames = parms
+			jars = parms
 		}
-		if len(jarnames) == 0 {
-			jarnames = allTables(db)
+		if len(jars) == 0 {
+			jars = allTables(db)
 		}
-		for _, jarname := range jarnames {
-			allFortunes(db, jarname, q, switches, os.Stdout)
+		for _, jar := range jars {
+			allFortunes(db, jar, q, switches, os.Stdout)
 		}
 	case "random":
 		if len(allTables(db)) == 0 {
@@ -105,8 +105,11 @@ func main() {
 			printJarStats(db, parms)
 			break
 		}
-
-		fmt.Println(randomFortune(db, switches, parms))
+		fortune, jar := randomFortune(db, parms, switches)
+		if switches["c"] != "" {
+			fmt.Printf("(%s)\n", jar)
+		}
+		fmt.Println(fortune)
 	case "serve":
 		port := "8000"
 		if len(parms) > 0 {
@@ -174,33 +177,32 @@ func parseArgs(args []string) (map[string]string, []string) {
 	return switches, parms
 }
 
-func printJarStats(db *sql.DB, jarnames []string) {
-	if len(jarnames) == 0 {
-		jarnames = allTables(db)
+func printJarStats(db *sql.DB, jars []string) {
+	if len(jars) == 0 {
+		jars = allTables(db)
 	}
 
 	jarNumRows := map[string]int{}
 	var totalRows int
-	for _, jarname := range jarnames {
-		nRows := queryNumRows(db, jarname)
-		jarNumRows[jarname] = nRows
+	for _, jar := range jars {
+		nRows := queryNumRows(db, jar)
+		jarNumRows[jar] = nRows
 		totalRows += nRows
 	}
 
 	fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "fortunes", "%")
 	fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 8), strings.Repeat("-", 6))
-	for _, jarname := range jarnames {
-		nRows := jarNumRows[jarname]
+	for _, jar := range jars {
+		nRows := jarNumRows[jar]
 		pctTotal := 0.0
 		if totalRows > 0 {
 			pctTotal = float64(nRows) / float64(totalRows) * 100
 		}
-		fmt.Printf("%-20s  %8d  %6.2f\n", jarname, nRows, pctTotal)
+		fmt.Printf("%-20s  %8d  %6.2f\n", jar, nRows, pctTotal)
 	}
 }
 
 func ingestJarFile(db *sql.DB, jarfile string) {
-	var jarname, sql string
 	var sb strings.Builder
 	var body string
 
@@ -210,27 +212,27 @@ func ingestJarFile(db *sql.DB, jarfile string) {
 	}
 	defer f.Close()
 
-	jarname = strings.Split(filepath.Base(jarfile), ".")[0]
-	fmt.Printf("Writing '%s' to table '%s'...", jarfile, jarname)
+	jar := strings.Split(filepath.Base(jarfile), ".")[0]
+	fmt.Printf("Writing '%s' to table '%s'...", jarfile, jar)
 
 	_, err = db.Exec("BEGIN TRANSACTION")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	sql = fmt.Sprintf("DROP TABLE IF EXISTS [%s]", jarname)
-	_, err = db.Exec(sql)
+	sqlstr := fmt.Sprintf("DROP TABLE IF EXISTS [%s]", jar)
+	_, err = db.Exec(sqlstr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	sql = fmt.Sprintf("CREATE TABLE [%s] (id INTEGER PRIMARY KEY NOT NULL, body TEXT)", jarname)
-	_, err = db.Exec(sql)
+	sqlstr = fmt.Sprintf("CREATE TABLE [%s] (id INTEGER PRIMARY KEY NOT NULL, body TEXT)", jar)
+	_, err = db.Exec(sqlstr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	sql = fmt.Sprintf("INSERT INTO [%s] (body) VALUES (?)", jarname)
-	insertStmt, err := db.Prepare(sql)
+	sqlstr = fmt.Sprintf("INSERT INTO [%s] (body) VALUES (?)", jar)
+	insertStmt, err := db.Prepare(sqlstr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -269,7 +271,7 @@ func ingestJarFile(db *sql.DB, jarfile string) {
 	fmt.Printf("Done.\n")
 }
 
-func deleteJar(db *sql.DB, jarname string) {
+func deleteJar(db *sql.DB, jar string) {
 	var err error
 	var sqlstr string
 
@@ -278,8 +280,8 @@ func deleteJar(db *sql.DB, jarname string) {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Deleting jar '%s'...", jarname)
-	sqlstr = fmt.Sprintf("DROP TABLE IF EXISTS [%s]", jarname)
+	fmt.Printf("Deleting jar '%s'...", jar)
+	sqlstr = fmt.Sprintf("DROP TABLE IF EXISTS [%s]", jar)
 	_, err = db.Exec(sqlstr)
 
 	_, err = db.Exec("COMMIT")
@@ -289,32 +291,32 @@ func deleteJar(db *sql.DB, jarname string) {
 	fmt.Printf("Done.\n")
 }
 
-func randomJar(db *sql.DB, jarnames []string) string {
+func randomJar(db *sql.DB, jars []string) string {
 	rand.Seed(time.Now().UnixNano())
 
-	if len(jarnames) == 0 {
-		jarnames = allTables(db)
+	if len(jars) == 0 {
+		jars = allTables(db)
 	}
 
-	return jarnames[rand.Intn(len(jarnames))]
+	return jars[rand.Intn(len(jars))]
 }
 
-func randomJarByWeight(db *sql.DB, jarnames []string) string {
+func randomJarByWeight(db *sql.DB, jars []string) string {
 	rand.Seed(time.Now().UnixNano())
 
-	if len(jarnames) == 0 {
-		jarnames = allTables(db)
+	if len(jars) == 0 {
+		jars = allTables(db)
 	}
 
 	jarNumRows := map[string]int{}
 	var totalRows int
-	for _, jarname := range jarnames {
-		nRows := queryNumRows(db, jarname)
-		jarNumRows[jarname] = nRows
+	for _, jar := range jars {
+		nRows := queryNumRows(db, jar)
+		jarNumRows[jar] = nRows
 		totalRows += nRows
 	}
 
-	// None of the jarnames exist, so just select from all jars.
+	// None of the jars exist, so just select from all jars.
 	if totalRows == 0 {
 		return randomJar(db, allTables(db))
 	}
@@ -323,10 +325,10 @@ func randomJarByWeight(db *sql.DB, jarnames []string) string {
 
 	var pickJar string
 	var sumRows int
-	for _, jarname := range jarnames {
-		sumRows += jarNumRows[jarname]
+	for _, jar := range jars {
+		sumRows += jarNumRows[jar]
 		if npick < sumRows {
-			pickJar = jarname
+			pickJar = jar
 			break
 		}
 	}
@@ -336,11 +338,11 @@ func randomJarByWeight(db *sql.DB, jarnames []string) string {
 	return pickJar
 }
 
-func randomJarFortune(db *sql.DB, jarname string) string {
+func randomJarFortune(db *sql.DB, jar string) string {
 	var body string
 	var err error
 
-	sqlstr := fmt.Sprintf("SELECT body FROM [%s] WHERE rowid = (abs(random()) %% (SELECT max(rowid) FROM [%s]) + 1)", jarname, jarname)
+	sqlstr := fmt.Sprintf("SELECT body FROM [%s] WHERE rowid = (abs(random()) %% (SELECT max(rowid) FROM [%s]) + 1)", jar, jar)
 	row := db.QueryRow(sqlstr)
 	err = row.Scan(&body)
 	if err == sql.ErrNoRows {
@@ -349,11 +351,11 @@ func randomJarFortune(db *sql.DB, jarname string) string {
 	return body
 }
 
-func jarFortune(db *sql.DB, jarname string, jarindex string) string {
+func jarFortune(db *sql.DB, jar string, jarIndex string) string {
 	var body string
 	var err error
 
-	sqlstr := fmt.Sprintf("SELECT body FROM [%s] WHERE rowid = %s", jarname, jarindex)
+	sqlstr := fmt.Sprintf("SELECT body FROM [%s] WHERE rowid = %s", jar, jarIndex)
 	row := db.QueryRow(sqlstr)
 	err = row.Scan(&body)
 	if err == sql.ErrNoRows {
@@ -362,22 +364,19 @@ func jarFortune(db *sql.DB, jarname string, jarindex string) string {
 	return body
 }
 
-func randomFortune(db *sql.DB, switches map[string]string, parms []string) string {
+func randomFortune(db *sql.DB, jars []string, options map[string]string) (string, string) {
 	var sb strings.Builder
 
 	pickJarFunc := randomJarByWeight
-	if switches["e"] != "" {
+	if options["e"] != "" {
 		pickJarFunc = randomJar
 	}
-	jarname := pickJarFunc(db, parms)
-	if switches["c"] != "" {
-		sb.WriteString(fmt.Sprintf("(%s)\n", jarname))
-	}
-	sb.WriteString(randomJarFortune(db, jarname))
-	return sb.String()
+	jar := pickJarFunc(db, jars)
+	sb.WriteString(randomJarFortune(db, jar))
+	return sb.String(), jar
 }
 
-func allFortunes(db *sql.DB, jarname string, q string, switches map[string]string, w io.Writer) {
+func allFortunes(db *sql.DB, jar string, q string, switches map[string]string, w io.Writer) {
 	var body string
 	var err error
 	var re *regexp.Regexp
@@ -390,7 +389,7 @@ func allFortunes(db *sql.DB, jarname string, q string, switches map[string]strin
 	}
 	re = regexp.MustCompile(sre)
 
-	sqlstr := fmt.Sprintf("SELECT body FROM [%s]", jarname)
+	sqlstr := fmt.Sprintf("SELECT body FROM [%s]", jar)
 	rows, err := db.Query(sqlstr)
 	if err != nil {
 		log.Fatal(err)
@@ -434,11 +433,11 @@ func allTables(db *sql.DB) []string {
 	return tbls
 }
 
-func queryNumRows(db *sql.DB, jarname string) int {
+func queryNumRows(db *sql.DB, jar string) int {
 	var rowid int
 	var err error
 
-	sqlstr := fmt.Sprintf("SELECT max(rowid) FROM [%s]", jarname)
+	sqlstr := fmt.Sprintf("SELECT max(rowid) FROM [%s]", jar)
 	row := db.QueryRow(sqlstr)
 	err = row.Scan(&rowid)
 	if err == sql.ErrNoRows {
@@ -450,9 +449,18 @@ func queryNumRows(db *sql.DB, jarname string) int {
 func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		sw := r.FormValue("sw")
-		qjars := r.FormValue("jars")
+
+		// &outputfmt=html
 		outputfmt := r.FormValue("outputfmt")
+
+		// &sw=ec
+		options := map[string]string{}
+		for _, ch := range r.FormValue("sw") {
+			options[string(ch)] = "y"
+		}
+
+		// &jars=perl,news
+		jars := strings.Split(r.FormValue("jars"), ",")
 
 		// Allow requests from all sites.
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -472,63 +480,56 @@ func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		}
 		w.Header().Set("Content-Type", contentType)
 
-		// /(jarname)
-		// /(jarname)/(123)
+		var jar string
+		var jarIndex string
+
+		// /(jar)
+		// /(jar)/(index)
+		// Ex. /news, /news/1
 		sre := `^/([\w\-]+)(?:/(\d*))?$`
 		re := regexp.MustCompile(sre)
 		matches := re.FindStringSubmatch(r.URL.Path)
-
-		var jarname string
-		var jarindex string
 		if matches != nil {
-			jarname = matches[1]
-			jarindex = matches[2]
-		}
-
-		if jarname == "" {
-			jarnames := []string{}
-			if qjars != "" {
-				jarnames = strings.Split(r.FormValue("jars"), ",")
-			}
-			pickJarFunc := randomJarByWeight
-			if strings.ContainsAny(sw, "e") {
-				pickJarFunc = randomJar
-			}
-			jarname = pickJarFunc(db, jarnames)
+			jar = matches[1]
+			jarIndex = matches[2]
 		}
 
 		var fortune string
-		if jarindex != "" {
-			fortune = jarFortune(db, jarname, jarindex)
+		if jar != "" && jarIndex != "" {
+			fortune = jarFortune(db, jar, jarIndex)
+		} else if jar != "" {
+			fortune = randomJarFortune(db, jar)
 		} else {
-			fortune = randomJarFortune(db, jarname)
+			fortune, jar = randomFortune(db, jars, options)
 		}
 
 		switch format {
 		case PlainText:
-			if strings.ContainsAny(sw, "c") {
-				fmt.Fprintf(w, "(%s)\n", jarname)
+			if options["c"] != "" {
+				fmt.Fprintf(w, "(%s)\n", jar)
 			}
 			fmt.Fprintf(w, fortune)
 			fmt.Fprintf(w, "\n")
 		case HtmlPre:
 			fmt.Fprintf(w, "<article>\n")
 			fmt.Fprintf(w, "<pre>\n")
-			if strings.ContainsAny(sw, "c") {
-				fmt.Fprintf(w, "(%s)\n", jarname)
+			if options["c"] != "" {
+				fmt.Fprintf(w, "(%s)\n", jar)
 			}
 			fmt.Fprintf(w, fortune)
 			fmt.Fprintf(w, "</pre>\n")
 			fmt.Fprintf(w, "</article>\n")
 		case Html:
 			fmt.Fprintf(w, "<article class=\"fortune\">\n")
-			if strings.ContainsAny(sw, "c") {
-				fmt.Fprintf(w, "(%s)<br>\n", jarname)
+			fmt.Fprintf(w, "<p>\n")
+			if options["c"] != "" {
+				fmt.Fprintf(w, "(%s)<br>\n", jar)
 			}
 			lines := strings.Split(strings.TrimSpace(fortune), "\n")
 			for _, line := range lines {
 				fmt.Fprintf(w, "%s<br>\n", line)
 			}
+			fmt.Fprintf(w, "</p>\n")
 			fmt.Fprintf(w, "</article>\n")
 		}
 	}
