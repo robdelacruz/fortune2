@@ -344,7 +344,20 @@ func randomJarFortune(db *sql.DB, jarname string) string {
 	row := db.QueryRow(sqlstr)
 	err = row.Scan(&body)
 	if err == sql.ErrNoRows {
-		log.Fatal(err)
+		return ""
+	}
+	return body
+}
+
+func jarFortune(db *sql.DB, jarname string, jarindex string) string {
+	var body string
+	var err error
+
+	sqlstr := fmt.Sprintf("SELECT body FROM [%s] WHERE rowid = %s", jarname, jarindex)
+	row := db.QueryRow(sqlstr)
+	err = row.Scan(&body)
+	if err == sql.ErrNoRows {
+		return ""
 	}
 	return body
 }
@@ -459,17 +472,37 @@ func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		}
 		w.Header().Set("Content-Type", contentType)
 
-		jarnames := []string{}
-		if qjars != "" {
-			jarnames = strings.Split(r.FormValue("jars"), ",")
+		// /(jarname)
+		// /(jarname)/(123)
+		sre := `^/([\w\-]+)(?:/(\d*))?$`
+		re := regexp.MustCompile(sre)
+		matches := re.FindStringSubmatch(r.URL.Path)
+
+		var jarname string
+		var jarindex string
+		if matches != nil {
+			jarname = matches[1]
+			jarindex = matches[2]
 		}
 
-		pickJarFunc := randomJarByWeight
-		if strings.ContainsAny(sw, "e") {
-			pickJarFunc = randomJar
+		if jarname == "" {
+			jarnames := []string{}
+			if qjars != "" {
+				jarnames = strings.Split(r.FormValue("jars"), ",")
+			}
+			pickJarFunc := randomJarByWeight
+			if strings.ContainsAny(sw, "e") {
+				pickJarFunc = randomJar
+			}
+			jarname = pickJarFunc(db, jarnames)
 		}
-		jarname := pickJarFunc(db, jarnames)
-		fortune := randomJarFortune(db, jarname)
+
+		var fortune string
+		if jarindex != "" {
+			fortune = jarFortune(db, jarname, jarindex)
+		} else {
+			fortune = randomJarFortune(db, jarname)
+		}
 
 		switch format {
 		case PlainText:
