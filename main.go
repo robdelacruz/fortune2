@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"math/rand"
@@ -117,6 +118,7 @@ func main() {
 		}
 		http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("./web"))))
 		http.HandleFunc("/", rootHandler(db))
+		http.HandleFunc("/fortune/", fortuneHandler(db))
 
 		fmt.Printf("Listening on %s...\n", port)
 		err = http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
@@ -532,5 +534,53 @@ func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			fmt.Fprintf(w, "</p>\n")
 			fmt.Fprintf(w, "</article>\n")
 		}
+	}
+}
+
+type FortuneData struct {
+	Jar     string
+	Fortune string
+}
+
+func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		// &sw=ec
+		options := map[string]string{}
+		for _, ch := range r.FormValue("sw") {
+			options[string(ch)] = "y"
+		}
+
+		// &jars=perl,news
+		jars := strings.Split(r.FormValue("jars"), ",")
+
+		w.Header().Set("Content-Type", "text/html")
+
+		var jar string
+		var jarIndex string
+
+		// /fortune/(jar)
+		// /fortune/(jar)/(index)
+		// Ex. /news, /news/1
+		sre := `^/fortune/([\w\-]+)(?:/(\d*))?$`
+		re := regexp.MustCompile(sre)
+		matches := re.FindStringSubmatch(r.URL.Path)
+		if matches != nil {
+			jar = matches[1]
+			jarIndex = matches[2]
+		}
+
+		var fortune string
+		if jar != "" && jarIndex != "" {
+			fortune = jarFortune(db, jar, jarIndex)
+		} else if jar != "" {
+			fortune = randomJarFortune(db, jar)
+		} else {
+			fortune, jar = randomFortune(db, jars, options)
+		}
+
+		t := template.Must(template.ParseFiles("fortune.html"))
+		t.Execute(w, FortuneData{Jar: jar, Fortune: fortune})
 	}
 }
