@@ -106,88 +106,16 @@ func main() {
 			break
 		}
 
-		pickJarFunc := randomJarByWeight
-		if switches["e"] != "" {
-			pickJarFunc = randomJar
-		}
-		jarname := pickJarFunc(db, parms)
-		if switches["c"] != "" {
-			fmt.Printf("(%s)\n", jarname)
-		}
-		fmt.Println(randomFortune(db, jarname))
+		fmt.Println(randomFortune(db, switches, parms))
 	case "serve":
 		port := "8000"
 		if len(parms) > 0 {
 			port = parms[0]
 		}
-		fmt.Printf("Listening on %s...\n", port)
 		http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("./web"))))
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			r.ParseForm()
-			sw := r.FormValue("sw")
-			qjars := r.FormValue("jars")
-			outputfmt := r.FormValue("outputfmt")
+		http.HandleFunc("/", rootHandler(db))
 
-			// Allow requests from all sites.
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-
-			format := PlainText
-			contentType := "text/plain"
-			switch outputfmt {
-			case "htmlpre":
-				format = HtmlPre
-				contentType = "text/html"
-			case "html":
-				format = Html
-				contentType = "text/html"
-			case "json":
-				format = Json
-				contentType = "application/json"
-			}
-			w.Header().Set("Content-Type", contentType)
-
-			jarnames := []string{}
-			if qjars != "" {
-				jarnames = strings.Split(r.FormValue("jars"), ",")
-			}
-
-			pickJarFunc := randomJarByWeight
-			if strings.ContainsAny(sw, "e") {
-				pickJarFunc = randomJar
-			}
-
-			jarname := pickJarFunc(db, jarnames)
-			fortune := randomFortune(db, jarname)
-
-			switch format {
-			case PlainText:
-				if strings.ContainsAny(sw, "c") {
-					fmt.Fprintf(w, "(%s)\n", jarname)
-				}
-				fmt.Fprintf(w, fortune)
-				fmt.Fprintf(w, "\n")
-			case HtmlPre:
-				fmt.Fprintf(w, "<article>\n")
-				fmt.Fprintf(w, "<pre>\n")
-				if strings.ContainsAny(sw, "c") {
-					fmt.Fprintf(w, "(%s)\n", jarname)
-				}
-				fmt.Fprintf(w, fortune)
-				fmt.Fprintf(w, "</pre>\n")
-				fmt.Fprintf(w, "</article>\n")
-			case Html:
-				fmt.Fprintf(w, "<article class=\"fortune\">\n")
-				if strings.ContainsAny(sw, "c") {
-					fmt.Fprintf(w, "(%s)<br>\n", jarname)
-				}
-				lines := strings.Split(strings.TrimSpace(fortune), "\n")
-				for _, line := range lines {
-					fmt.Fprintf(w, "%s<br>\n", line)
-				}
-				fmt.Fprintf(w, "</article>\n")
-			}
-
-		})
+		fmt.Printf("Listening on %s...\n", port)
 		err = http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 		log.Fatal(err)
 	}
@@ -408,7 +336,7 @@ func randomJarByWeight(db *sql.DB, jarnames []string) string {
 	return pickJar
 }
 
-func randomFortune(db *sql.DB, jarname string) string {
+func randomJarFortune(db *sql.DB, jarname string) string {
 	var body string
 	var err error
 
@@ -419,6 +347,21 @@ func randomFortune(db *sql.DB, jarname string) string {
 		log.Fatal(err)
 	}
 	return body
+}
+
+func randomFortune(db *sql.DB, switches map[string]string, parms []string) string {
+	var sb strings.Builder
+
+	pickJarFunc := randomJarByWeight
+	if switches["e"] != "" {
+		pickJarFunc = randomJar
+	}
+	jarname := pickJarFunc(db, parms)
+	if switches["c"] != "" {
+		sb.WriteString(fmt.Sprintf("(%s)\n", jarname))
+	}
+	sb.WriteString(randomJarFortune(db, jarname))
+	return sb.String()
 }
 
 func allFortunes(db *sql.DB, jarname string, q string, switches map[string]string, w io.Writer) {
@@ -489,4 +432,71 @@ func queryNumRows(db *sql.DB, jarname string) int {
 		log.Fatal(err)
 	}
 	return rowid
+}
+
+func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		sw := r.FormValue("sw")
+		qjars := r.FormValue("jars")
+		outputfmt := r.FormValue("outputfmt")
+
+		// Allow requests from all sites.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		format := PlainText
+		contentType := "text/plain"
+		switch outputfmt {
+		case "htmlpre":
+			format = HtmlPre
+			contentType = "text/html"
+		case "html":
+			format = Html
+			contentType = "text/html"
+		case "json":
+			format = Json
+			contentType = "application/json"
+		}
+		w.Header().Set("Content-Type", contentType)
+
+		jarnames := []string{}
+		if qjars != "" {
+			jarnames = strings.Split(r.FormValue("jars"), ",")
+		}
+
+		pickJarFunc := randomJarByWeight
+		if strings.ContainsAny(sw, "e") {
+			pickJarFunc = randomJar
+		}
+		jarname := pickJarFunc(db, jarnames)
+		fortune := randomJarFortune(db, jarname)
+
+		switch format {
+		case PlainText:
+			if strings.ContainsAny(sw, "c") {
+				fmt.Fprintf(w, "(%s)\n", jarname)
+			}
+			fmt.Fprintf(w, fortune)
+			fmt.Fprintf(w, "\n")
+		case HtmlPre:
+			fmt.Fprintf(w, "<article>\n")
+			fmt.Fprintf(w, "<pre>\n")
+			if strings.ContainsAny(sw, "c") {
+				fmt.Fprintf(w, "(%s)\n", jarname)
+			}
+			fmt.Fprintf(w, fortune)
+			fmt.Fprintf(w, "</pre>\n")
+			fmt.Fprintf(w, "</article>\n")
+		case Html:
+			fmt.Fprintf(w, "<article class=\"fortune\">\n")
+			if strings.ContainsAny(sw, "c") {
+				fmt.Fprintf(w, "(%s)<br>\n", jarname)
+			}
+			lines := strings.Split(strings.TrimSpace(fortune), "\n")
+			for _, line := range lines {
+				fmt.Fprintf(w, "%s<br>\n", line)
+			}
+			fmt.Fprintf(w, "</article>\n")
+		}
+	}
 }
