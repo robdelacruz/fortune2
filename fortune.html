@@ -19,6 +19,12 @@ body { margin: 0 auto; width: 50% }
 {{.Fortune}}<br>
 </p>
 </article>
+<script>
+let new_fortune = document.querySelector("#new_fortune");
+new_fortune.addEventListener("click", function(e) {
+    window.location.reload(true);
+});
+</script>
 </body>
 </html>
 
