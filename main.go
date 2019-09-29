@@ -379,10 +379,10 @@ func randomFortune(db *sql.DB, jars []string, options map[string]string) (string
 }
 
 func allFortunes(db *sql.DB, jar string, q string, switches map[string]string, w io.Writer) {
-	var body string
 	var err error
 	var re *regexp.Regexp
 	bufw := bufio.NewWriter(w)
+	defer bufw.Flush()
 
 	sre := q
 	// -i  ignore case
@@ -394,28 +394,26 @@ func allFortunes(db *sql.DB, jar string, q string, switches map[string]string, w
 	sqlstr := fmt.Sprintf("SELECT body FROM [%s]", jar)
 	rows, err := db.Query(sqlstr)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	for rows.Next() {
-		err = rows.Scan(&body)
-		if err != nil {
-			log.Fatal(err)
-		}
-
+		var body string
+		rows.Scan(&body)
 		if !re.MatchString(body) {
 			continue
 		}
-		_, err = bufw.WriteString(body)
-		if err != nil {
-			log.Fatal(err)
+
+		if switches["c"] != "" {
+			bufw.WriteString(fmt.Sprintf("(%s)\n", jar))
 		}
+
+		bufw.WriteString(body)
 		// Make sure the "%" starts on a newline.
 		if !strings.HasSuffix(body, "\n") {
 			bufw.WriteString("\n")
 		}
 		bufw.WriteString("%\n")
 	}
-	bufw.Flush()
 }
 
 func allTables(db *sql.DB) []string {
