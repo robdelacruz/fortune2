@@ -116,9 +116,10 @@ func main() {
 		if len(parms) > 0 {
 			port = parms[0]
 		}
-		http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("./web"))))
-		http.HandleFunc("/", rootHandler(db))
+		http.Handle("/asset/", http.StripPrefix("/asset/", http.FileServer(http.Dir("./asset"))))
 		http.HandleFunc("/fortune/", fortuneHandler(db))
+		http.HandleFunc("/site/", siteHandler(db))
+		http.HandleFunc("/", rootHandler(db))
 
 		fmt.Printf("Listening on %s...\n", port)
 		err = http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
@@ -446,7 +447,7 @@ func queryNumRows(db *sql.DB, jar string) int {
 	return rowid
 }
 
-func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -483,10 +484,10 @@ func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		var jar string
 		var jarIndex string
 
-		// /(jar)
-		// /(jar)/(index)
-		// Ex. /news, /news/1
-		sre := `^/([\w\-]+)(?:/(\d*))?$`
+		// /fortune/<jar>/<index>
+		// /fortune/news
+		// /fortune/news/1
+		sre := `^/fortune/([\w\-]+)(?:/(\d*))?$`
 		re := regexp.MustCompile(sre)
 		matches := re.FindStringSubmatch(r.URL.Path)
 		if matches != nil {
@@ -508,15 +509,14 @@ func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			if options["c"] != "" {
 				fmt.Fprintf(w, "(%s)\n", jar)
 			}
-			fmt.Fprintf(w, fortune)
-			fmt.Fprintf(w, "\n")
+			fmt.Fprintln(w, fortune)
 		case HtmlPre:
 			fmt.Fprintf(w, "<article>\n")
 			fmt.Fprintf(w, "<pre>\n")
 			if options["c"] != "" {
 				fmt.Fprintf(w, "(%s)\n", jar)
 			}
-			fmt.Fprintf(w, fortune)
+			fmt.Fprintln(w, fortune)
 			fmt.Fprintf(w, "</pre>\n")
 			fmt.Fprintf(w, "</article>\n")
 		case Html:
@@ -540,7 +540,7 @@ type FortuneData struct {
 	Fortune string
 }
 
-func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -580,5 +580,17 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 
 		t := template.Must(template.ParseFiles("fortune.html"))
 		t.Execute(w, FortuneData{Jar: jar, Fortune: fortune})
+	}
+}
+
+func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+
+		helptext := `Help
+----
+<put help text here>
+`
+		fmt.Fprintf(w, helptext)
 	}
 }
