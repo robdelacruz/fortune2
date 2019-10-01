@@ -558,10 +558,10 @@ func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		var jar string
 		var jarIndex string
 
-		// /fortune/(jar)
-		// /fortune/(jar)/(index)
-		// Ex. /news, /news/1
-		sre := `^/fortune/([\w\-]+)(?:/(\d*))?$`
+		// /site/(jar)
+		// /site/(jar)/(index)
+		// Ex. /site/news, /site/news/1
+		sre := `^/site/([\w\-]+)(?:/(\d*))?$`
 		re := regexp.MustCompile(sre)
 		matches := re.FindStringSubmatch(r.URL.Path)
 		if matches != nil {
