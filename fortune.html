@@ -8,17 +8,29 @@
 body { margin: 0 auto; width: 50% }
 .fortune { padding: 20px; border: 1px dotted; }
 #new_fortune { margin: 20px 0; }
+.fortune {margin: 1em 0;}
 </style>
 </head>
 <body>
 <h1>fortune2 test page</h1>
-<button id="new_fortune">New Fortune</button>
+<form action="./" method="get">
+    <label for="jars">Select a category</label><br>
+    <input id="jars" list="jarslist" value="any category">
+    <datalist id="jarslist">
+        <option value="any category">
+        <option value="fortunes">
+        <option value="news">
+        <option value="perl">
+        <option value="men-women">
+    </datalist>
+</form>
 <article class="fortune">
 <p>
 ({{.Jar}})<br>
 {{.Fortune}}<br>
 </p>
 </article>
+<button id="new_fortune">New Fortune</button>
 <script>
 let new_fortune = document.querySelector("#new_fortune");
 new_fortune.addEventListener("click", function(e) {
