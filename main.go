@@ -536,45 +536,39 @@ type Fortune struct {
 
 type FortuneCtx struct {
 	Fortune
-	Jars []string
-	QJar string
+	Jars   []string
+	Qjar   string
+	Qjarid string
 }
 
 func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var qjar string
-		var qjarIndex string
+		var jar string
+		var jarid string
 
+		// ?jar=<abc>&jarid=<nnn>
+		// Ex. ?jar=fortunes&jarid=2
 		r.ParseForm()
-		qjar = r.FormValue("jar") // &jar=<jar_name>
-		if qjar == "(random)" {
-			qjar = ""
+		jar = r.FormValue("jar")
+		jarid = r.FormValue("jarid")
+
+		if jar == "(random)" {
+			jar = ""
 		}
 
 		w.Header().Set("Content-Type", "text/html")
 
-		// /site/(jar)
-		// /site/(jar)/(index)
-		// Ex. /site/news, /site/news/1
-		sre := `^/site/([\w\-]+)(?:/(\d*))?$`
-		re := regexp.MustCompile(sre)
-		matches := re.FindStringSubmatch(r.URL.Path)
-		if matches != nil {
-			qjar = matches[1]
-			qjarIndex = matches[2]
-		}
-
 		var fortune Fortune
-		if qjar != "" && qjarIndex != "" {
-			fortune = jarFortune(db, qjar, qjarIndex)
-		} else if qjar != "" {
-			fortune = randomJarFortune(db, qjar)
+		if jar != "" && jarid != "" {
+			fortune = jarFortune(db, jar, jarid)
+		} else if jar != "" {
+			fortune = randomJarFortune(db, jar)
 		} else {
 			fortune = randomFortune(db, nil, nil)
 		}
 
 		t := template.Must(template.ParseFiles("fortune.html"))
-		t.Execute(w, &FortuneCtx{Fortune: fortune, Jars: allTables(db), QJar: qjar})
+		t.Execute(w, &FortuneCtx{Fortune: fortune, Jars: allTables(db), Qjar: jar, Qjarid: jarid})
 	}
 }
 

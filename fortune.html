@@ -15,8 +15,8 @@ body { margin: 0 auto; width: 50% }
 <h1>fortune2 test page</h1>
 <form action="./" method="get">
     <label for="jar">Select a category</label><br>
-    {{if .QJar}}
-    <input id="jar" name="jar" list="jarslist" value="{{.QJar}}">
+    {{if .Qjar}}
+    <input id="jar" name="jar" list="jarslist" value="{{.Qjar}}">
     {{else}}
     <input id="jar" name="jar" list="jarslist" value="(random)">
     {{end}}
@@ -28,12 +28,21 @@ body { margin: 0 auto; width: 50% }
     </datalist>
     <button id="get_fortune">Get Fortune</button>
 </form>
-<article class="fortune">
-<p>
-({{.Fortune.Jar}})<br>
-{{.Fortune.Body}}<br>
-</p>
-</article>
+{{if .Fortune.Body}}
+    <article class="fortune">
+    <p>
+    ({{.Fortune.Jar}})<br>
+    {{.Fortune.Body}}<br>
+    </p>
+    <p>
+    {{if not .Qjarid}}
+    <a href="/site?jar={{.Fortune.Jar}}&jarid={{.Fortune.ID}}">permalink</a>
+    {{end}}
+    </p>
+    </article>
+{{else}}
+    <p>No fortune exists.</p>
+{{end}}
 <script>
 let get_fortune = document.querySelector("#get_fortune");
 get_fortune.addEventListener("click", function(e) {
