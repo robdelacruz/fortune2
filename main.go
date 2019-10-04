@@ -106,11 +106,11 @@ func main() {
 			printJarStats(db, parms)
 			break
 		}
-		fortune, jar := randomFortune(db, parms, switches)
+		fortune := randomFortune(db, parms, switches)
 		if switches["c"] != "" {
-			fmt.Printf("(%s)\n", jar)
+			fmt.Printf("(%s)\n", fortune.Jar)
 		}
-		fmt.Println(fortune)
+		fmt.Println(fortune.Body)
 	case "serve":
 		port := "8000"
 		if len(parms) > 0 {
@@ -193,15 +193,15 @@ func printJarStats(db *sql.DB, jars []string) {
 		totalRows += nRows
 	}
 
-	fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "fortunes", "%")
-	fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 8), strings.Repeat("-", 6))
+	fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "# fortunes", "%")
+	fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 10), strings.Repeat("-", 6))
 	for _, jar := range jars {
 		nRows := jarNumRows[jar]
 		pctTotal := 0.0
 		if totalRows > 0 {
 			pctTotal = float64(nRows) / float64(totalRows) * 100
 		}
-		fmt.Printf("%-20s  %8d  %6.2f\n", jar, nRows, pctTotal)
+		fmt.Printf("%-20s  %10d  %6.2f\n", jar, nRows, pctTotal)
 	}
 }
 
@@ -341,42 +341,35 @@ func randomJarByWeight(db *sql.DB, jars []string) string {
 	return pickJar
 }
 
-func randomJarFortune(db *sql.DB, jar string) string {
-	var body string
-	var err error
+func randomJarFortune(db *sql.DB, jar string) Fortune {
+	var fortune Fortune
 
-	sqlstr := fmt.Sprintf("SELECT body FROM [%s] WHERE rowid = (abs(random()) %% (SELECT max(rowid) FROM [%s]) + 1)", jar, jar)
+	sqlstr := fmt.Sprintf("SELECT id, body FROM [%s] WHERE rowid = (abs(random()) %% (SELECT max(rowid) FROM [%s]) + 1)", jar, jar)
 	row := db.QueryRow(sqlstr)
-	err = row.Scan(&body)
-	if err == sql.ErrNoRows {
-		return ""
-	}
-	return body
+	row.Scan(&fortune.ID, &fortune.Body)
+	fortune.Jar = jar
+
+	return fortune
 }
 
-func jarFortune(db *sql.DB, jar string, jarIndex string) string {
-	var body string
-	var err error
+func jarFortune(db *sql.DB, jar string, jarIndex string) Fortune {
+	var fortune Fortune
 
-	sqlstr := fmt.Sprintf("SELECT body FROM [%s] WHERE rowid = %s", jar, jarIndex)
+	sqlstr := fmt.Sprintf("SELECT id, body FROM [%s] WHERE rowid = %s", jar, jarIndex)
 	row := db.QueryRow(sqlstr)
-	err = row.Scan(&body)
-	if err == sql.ErrNoRows {
-		return ""
-	}
-	return body
+	row.Scan(&fortune.ID, &fortune.Body)
+	fortune.Jar = jar
+
+	return fortune
 }
 
-func randomFortune(db *sql.DB, jars []string, options map[string]string) (string, string) {
-	var sb strings.Builder
-
+func randomFortune(db *sql.DB, jars []string, options map[string]string) Fortune {
 	pickJarFunc := randomJarByWeight
 	if options["e"] != "" {
 		pickJarFunc = randomJar
 	}
 	jar := pickJarFunc(db, jars)
-	sb.WriteString(randomJarFortune(db, jar))
-	return sb.String(), jar
+	return randomJarFortune(db, jar)
 }
 
 func allFortunes(db *sql.DB, jar string, q string, switches map[string]string, w io.Writer) {
@@ -495,13 +488,13 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			jarIndex = matches[2]
 		}
 
-		var fortune string
+		var fortune Fortune
 		if jar != "" && jarIndex != "" {
 			fortune = jarFortune(db, jar, jarIndex)
 		} else if jar != "" {
 			fortune = randomJarFortune(db, jar)
 		} else {
-			fortune, jar = randomFortune(db, jars, options)
+			fortune = randomFortune(db, jars, options)
 		}
 
 		switch format {
@@ -509,14 +502,14 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			if options["c"] != "" {
 				fmt.Fprintf(w, "(%s)\n", jar)
 			}
-			fmt.Fprintln(w, fortune)
+			fmt.Fprintln(w, fortune.Body)
 		case HtmlPre:
 			fmt.Fprintf(w, "<article>\n")
 			fmt.Fprintf(w, "<pre>\n")
 			if options["c"] != "" {
 				fmt.Fprintf(w, "(%s)\n", jar)
 			}
-			fmt.Fprintln(w, fortune)
+			fmt.Fprintln(w, fortune.Body)
 			fmt.Fprintf(w, "</pre>\n")
 			fmt.Fprintf(w, "</article>\n")
 		case Html:
@@ -525,7 +518,7 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			if options["c"] != "" {
 				fmt.Fprintf(w, "(%s)<br>\n", jar)
 			}
-			lines := strings.Split(strings.TrimSpace(fortune), "\n")
+			lines := strings.Split(strings.TrimSpace(fortune.Body), "\n")
 			for _, line := range lines {
 				fmt.Fprintf(w, "%s<br>\n", line)
 			}
@@ -535,28 +528,30 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
-type FortuneData struct {
-	Jar     string
-	Fortune string
+type Fortune struct {
+	Jar  string
+	ID   string
+	Body string
+}
+
+type FortuneCtx struct {
+	Fortune
+	Jars []string
+	QJar string
 }
 
 func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
+		var qjar string
+		var qjarIndex string
 
-		// &sw=ec
-		options := map[string]string{}
-		for _, ch := range r.FormValue("sw") {
-			options[string(ch)] = "y"
+		r.ParseForm()
+		qjar = r.FormValue("jar") // &jar=<jar_name>
+		if qjar == "(random)" {
+			qjar = ""
 		}
 
-		// &jars=perl,news
-		jars := strings.Split(r.FormValue("jars"), ",")
-
 		w.Header().Set("Content-Type", "text/html")
-
-		var jar string
-		var jarIndex string
 
 		// /site/(jar)
 		// /site/(jar)/(index)
@@ -565,21 +560,21 @@ func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		re := regexp.MustCompile(sre)
 		matches := re.FindStringSubmatch(r.URL.Path)
 		if matches != nil {
-			jar = matches[1]
-			jarIndex = matches[2]
+			qjar = matches[1]
+			qjarIndex = matches[2]
 		}
 
-		var fortune string
-		if jar != "" && jarIndex != "" {
-			fortune = jarFortune(db, jar, jarIndex)
-		} else if jar != "" {
-			fortune = randomJarFortune(db, jar)
+		var fortune Fortune
+		if qjar != "" && qjarIndex != "" {
+			fortune = jarFortune(db, qjar, qjarIndex)
+		} else if qjar != "" {
+			fortune = randomJarFortune(db, qjar)
 		} else {
-			fortune, jar = randomFortune(db, jars, options)
+			fortune = randomFortune(db, nil, nil)
 		}
 
 		t := template.Must(template.ParseFiles("fortune.html"))
-		t.Execute(w, FortuneData{Jar: jar, Fortune: fortune})
+		t.Execute(w, &FortuneCtx{Fortune: fortune, Jars: allTables(db), QJar: qjar})
 	}
 }
 

@@ -14,26 +14,29 @@ body { margin: 0 auto; width: 50% }
 <body>
 <h1>fortune2 test page</h1>
 <form action="./" method="get">
-    <label for="jars">Select a category</label><br>
-    <input id="jars" list="jarslist" value="any category">
+    <label for="jar">Select a category</label><br>
+    {{if .QJar}}
+    <input id="jar" name="jar" list="jarslist" value="{{.QJar}}">
+    {{else}}
+    <input id="jar" name="jar" list="jarslist" value="(random)">
+    {{end}}
     <datalist id="jarslist">
-        <option value="any category">
-        <option value="fortunes">
-        <option value="news">
-        <option value="perl">
-        <option value="men-women">
+        <option value="(random)">
+        {{range .Jars}}
+        <option value="{{.}}">
+        {{end}}
     </datalist>
+    <button id="get_fortune">Get Fortune</button>
 </form>
 <article class="fortune">
 <p>
-({{.Jar}})<br>
-{{.Fortune}}<br>
+({{.Fortune.Jar}})<br>
+{{.Fortune.Body}}<br>
 </p>
 </article>
-<button id="new_fortune">New Fortune</button>
 <script>
-let new_fortune = document.querySelector("#new_fortune");
-new_fortune.addEventListener("click", function(e) {
+let get_fortune = document.querySelector("#get_fortune");
+get_fortune.addEventListener("click", function(e) {
     window.location.reload(true);
 });
 </script>
