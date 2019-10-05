@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -18,14 +19,27 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type FortuneFmt int
+// This represents one fortune cookie.
+// An empty Body represents a nonexisting fortune.
+type Fortune struct {
+	Jar  string `json:"jar"`
+	ID   string `json:"id"`
+	Body string `json:"body"`
+}
 
-const (
-	PlainText = FortuneFmt(iota)
-	HtmlPre
-	Html
-	Json
-)
+// struct to be passed to web templates.
+type FortuneCtx struct {
+	Fortune
+	Jars   []string
+	Qjar   string
+	Qjarid string
+}
+
+type JarInfo struct {
+	Jar         string  `json:"jar"`
+	NumFortunes int     `json:"numfortunes"`
+	PctTotal    float64 `json:"pcttotal"`
+}
 
 func main() {
 	var db *sql.DB
@@ -72,7 +86,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		printJarStats(db, tbls)
+		printJarStats(db, parms)
 	case "ingest":
 		for _, jarfile := range parms {
 			ingestJarFile(db, jarfile)
@@ -102,6 +116,8 @@ func main() {
 			os.Exit(1)
 		}
 
+		// -f switch comes from original 'fortune'.
+		// Print jars to be searched, but don't show fortune.
 		if switches["f"] != "" {
 			printJarStats(db, parms)
 			break
@@ -117,6 +133,7 @@ func main() {
 			port = parms[0]
 		}
 		http.Handle("/asset/", http.StripPrefix("/asset/", http.FileServer(http.Dir("./asset"))))
+		http.HandleFunc("/info/", infoHandler(db))
 		http.HandleFunc("/fortune/", fortuneHandler(db))
 		http.HandleFunc("/site/", siteHandler(db))
 		http.HandleFunc("/", rootHandler(db))
@@ -180,7 +197,7 @@ func parseArgs(args []string) (map[string]string, []string) {
 	return switches, parms
 }
 
-func printJarStats(db *sql.DB, jars []string) {
+func jarsInfo(db *sql.DB, jars []string) []JarInfo {
 	if len(jars) == 0 {
 		jars = allTables(db)
 	}
@@ -193,15 +210,26 @@ func printJarStats(db *sql.DB, jars []string) {
 		totalRows += nRows
 	}
 
-	fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "# fortunes", "%")
-	fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 10), strings.Repeat("-", 6))
+	jis := []JarInfo{}
 	for _, jar := range jars {
 		nRows := jarNumRows[jar]
 		pctTotal := 0.0
 		if totalRows > 0 {
 			pctTotal = float64(nRows) / float64(totalRows) * 100
 		}
-		fmt.Printf("%-20s  %10d  %6.2f\n", jar, nRows, pctTotal)
+		jis = append(jis, JarInfo{Jar: jar, NumFortunes: nRows, PctTotal: pctTotal})
+	}
+
+	return jis
+}
+
+func printJarStats(db *sql.DB, jars []string) {
+	fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "# fortunes", "%")
+	fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 10), strings.Repeat("-", 6))
+
+	jis := jarsInfo(db, jars)
+	for _, ji := range jis {
+		fmt.Printf("%-20s  %10d  %6.2f\n", ji.Jar, ji.NumFortunes, ji.PctTotal)
 	}
 }
 
@@ -454,22 +482,21 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		}
 
 		// &jars=perl,news
-		jars := strings.Split(r.FormValue("jars"), ",")
+		var jars []string
+		if r.FormValue("jars") != "" {
+			jars = strings.Split(r.FormValue("jars"), ",")
+		}
 
 		// Allow requests from all sites.
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
-		format := PlainText
 		contentType := "text/plain"
 		switch outputfmt {
 		case "htmlpre":
-			format = HtmlPre
 			contentType = "text/html"
 		case "html":
-			format = Html
 			contentType = "text/html"
 		case "json":
-			format = Json
 			contentType = "application/json"
 		}
 		w.Header().Set("Content-Type", contentType)
@@ -497,26 +524,21 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			fortune = randomFortune(db, jars, options)
 		}
 
-		switch format {
-		case PlainText:
-			if options["c"] != "" {
-				fmt.Fprintf(w, "(%s)\n", jar)
-			}
-			fmt.Fprintln(w, fortune.Body)
-		case HtmlPre:
+		switch outputfmt {
+		case "htmlpre":
 			fmt.Fprintf(w, "<article>\n")
 			fmt.Fprintf(w, "<pre>\n")
 			if options["c"] != "" {
-				fmt.Fprintf(w, "(%s)\n", jar)
+				fmt.Fprintf(w, "(%s)\n", fortune.Jar)
 			}
 			fmt.Fprintln(w, fortune.Body)
 			fmt.Fprintf(w, "</pre>\n")
 			fmt.Fprintf(w, "</article>\n")
-		case Html:
+		case "html":
 			fmt.Fprintf(w, "<article class=\"fortune\">\n")
 			fmt.Fprintf(w, "<p>\n")
 			if options["c"] != "" {
-				fmt.Fprintf(w, "(%s)<br>\n", jar)
+				fmt.Fprintf(w, "(%s)<br>\n", fortune.Jar)
 			}
 			lines := strings.Split(strings.TrimSpace(fortune.Body), "\n")
 			for _, line := range lines {
@@ -524,21 +546,16 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			}
 			fmt.Fprintf(w, "</p>\n")
 			fmt.Fprintf(w, "</article>\n")
+		case "json":
+			b, _ := json.MarshalIndent(fortune, "", "\t")
+			w.Write(b)
+		default:
+			if options["c"] != "" {
+				fmt.Fprintf(w, "(%s)\n", fortune.Jar)
+			}
+			fmt.Fprintln(w, fortune.Body)
 		}
 	}
-}
-
-type Fortune struct {
-	Jar  string
-	ID   string
-	Body string
-}
-
-type FortuneCtx struct {
-	Fortune
-	Jars   []string
-	Qjar   string
-	Qjarid string
 }
 
 func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
@@ -581,5 +598,23 @@ func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 <put help text here>
 `
 		fmt.Fprintf(w, helptext)
+	}
+}
+
+func infoHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+
+		// &jars=perl,news
+		var jars []string
+		if r.FormValue("jars") != "" {
+			jars = strings.Split(r.FormValue("jars"), ",")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		jis := jarsInfo(db, jars)
+		b, _ := json.MarshalIndent(jis, "", "\t")
+		w.Write(b)
 	}
 }
