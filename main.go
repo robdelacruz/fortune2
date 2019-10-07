@@ -86,7 +86,8 @@ func main() {
 			os.Exit(1)
 		}
 
-		printJarStats(db, parms)
+		jis := jarsInfo(db, parms)
+		printJarStats(os.Stdout, jis)
 	case "ingest":
 		for _, jarfile := range parms {
 			ingestJarFile(db, jarfile)
@@ -119,7 +120,8 @@ func main() {
 		// -f switch comes from original 'fortune'.
 		// Print jars to be searched, but don't show fortune.
 		if switches["f"] != "" {
-			printJarStats(db, parms)
+			jis := jarsInfo(db, parms)
+			printJarStats(os.Stdout, jis)
 			break
 		}
 		fortune := randomFortune(db, parms, switches)
@@ -223,13 +225,15 @@ func jarsInfo(db *sql.DB, jars []string) []JarInfo {
 	return jis
 }
 
-func printJarStats(db *sql.DB, jars []string) {
-	fmt.Printf("%-20s  %8s  %6s\n", "Fortune Jar", "# fortunes", "%")
-	fmt.Printf("%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 10), strings.Repeat("-", 6))
+func printJarStats(w io.Writer, jis []JarInfo) {
+	bufw := bufio.NewWriter(w)
+	defer bufw.Flush()
 
-	jis := jarsInfo(db, jars)
+	fmt.Fprintf(bufw, "%-20s  %8s  %6s\n", "Fortune Jar", "# fortunes", "%")
+	fmt.Fprintf(bufw, "%-20s  %8s  %6s\n", strings.Repeat("-", 20), strings.Repeat("-", 10), strings.Repeat("-", 6))
+
 	for _, ji := range jis {
-		fmt.Printf("%-20s  %10d  %6.2f\n", ji.Jar, ji.NumFortunes, ji.PctTotal)
+		fmt.Fprintf(bufw, "%-20s  %10d  %6.2f\n", ji.Jar, ji.NumFortunes, ji.PctTotal)
 	}
 }
 
@@ -470,18 +474,15 @@ func queryNumRows(db *sql.DB, jar string) int {
 
 func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// ?jars=jar1,jar2,jar3
+		// &w=ec
+		// &utputfmt=json
 		r.ParseForm()
-
-		// &outputfmt=html
 		outputfmt := r.FormValue("outputfmt")
-
-		// &sw=ec
 		options := map[string]string{}
 		for _, ch := range r.FormValue("sw") {
 			options[string(ch)] = "y"
 		}
-
-		// &jars=perl,news
 		var jars []string
 		if r.FormValue("jars") != "" {
 			jars = strings.Split(r.FormValue("jars"), ",")
@@ -603,9 +604,10 @@ func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 
 func infoHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// ?jars=jar1,jar2,jar3
+		// &outputfmt=json
 		r.ParseForm()
-
-		// &jars=perl,news
+		outputfmt := r.FormValue("outputfmt")
 		var jars []string
 		if r.FormValue("jars") != "" {
 			jars = strings.Split(r.FormValue("jars"), ",")
@@ -614,7 +616,12 @@ func infoHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		jis := jarsInfo(db, jars)
-		b, _ := json.MarshalIndent(jis, "", "\t")
-		w.Write(b)
+		switch outputfmt {
+		case "json":
+			b, _ := json.MarshalIndent(jis, "", "\t")
+			w.Write(b)
+		default:
+			printJarStats(w, jis)
+		}
 	}
 }
