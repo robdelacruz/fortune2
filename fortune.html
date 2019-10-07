@@ -44,9 +44,9 @@ body { margin: 0 auto; width: 50% }
     <p>No fortune exists.</p>
 {{end}}
 <script>
-let get_fortune = document.querySelector("#get_fortune");
-get_fortune.addEventListener("click", function(e) {
-    window.location.reload(true);
+let jar_entry = document.querySelector("#jar");
+jar_entry.addEventListener("focus", function(e) {
+    jar_entry.select();
 });
 </script>
 </body>
