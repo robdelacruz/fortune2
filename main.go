@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"html/template"
+	//	"html/template"
 	"io"
 	"log"
 	"math/rand"
@@ -109,7 +109,7 @@ func main() {
 			jars = allTables(db)
 		}
 		for _, jar := range jars {
-			allFortunes(db, jar, q, switches, os.Stdout)
+			printAllFortunes(os.Stdout, db, jar, q, switches)
 		}
 	case "random":
 		if len(allTables(db)) == 0 {
@@ -404,7 +404,7 @@ func randomFortune(db *sql.DB, jars []string, options map[string]string) Fortune
 	return randomJarFortune(db, jar)
 }
 
-func allFortunes(db *sql.DB, jar string, q string, switches map[string]string, w io.Writer) {
+func printAllFortunes(w io.Writer, db *sql.DB, jar string, q string, switches map[string]string) {
 	var err error
 	var re *regexp.Regexp
 	bufw := bufio.NewWriter(w)
@@ -585,8 +585,10 @@ func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			fortune = randomFortune(db, nil, nil)
 		}
 
-		t := template.Must(template.ParseFiles("fortune.html"))
-		t.Execute(w, &FortuneCtx{Fortune: fortune, Jars: allTables(db), Qjar: jar, Qjarid: jarid})
+		printFortunePage(w, fortune, allTables(db), jar, jarid)
+
+		//		t := template.Must(template.ParseFiles("fortune.html"))
+		//		t.Execute(w, &FortuneCtx{Fortune: fortune, Jars: allTables(db), Qjar: jar, Qjarid: jarid})
 	}
 }
 
@@ -624,4 +626,67 @@ func infoHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			printJarStats(w, jis)
 		}
 	}
+}
+
+func printFortunePage(w io.Writer, fortune Fortune, jars []string, qjar, qjarid string) {
+	fmt.Fprintln(w, `<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fortune2 test page</title>
+<style>
+body { margin: 0 auto; width: 50% }
+.fortune { padding: 20px; border: 1px dotted; }
+#new_fortune { margin: 20px 0; }
+.fortune {margin: 1em 0;}
+</style>
+</head>
+<body>`)
+	fmt.Fprintln(w, `<h1>Get your Fortune</h1>`)
+	fmt.Fprintln(w, `<form action="./" method="get">`)
+	fmt.Fprintln(w, `<label for="jar">Select a category</label><br>`)
+	if qjar != "" {
+		fmt.Fprintf(w, `<input id="jar" name="jar" list="jarslist" value="%s">`, qjar)
+	} else {
+		fmt.Fprintf(w, `<input id="jar" name="jar" list="jarslist" value="(random)">`)
+	}
+	fmt.Fprintln(w, "")
+
+	fmt.Fprintln(w, `<datalist id="jarslist">`)
+	fmt.Fprintln(w, `   <option value="(random)">`)
+	for _, jar := range jars {
+		fmt.Fprintf(w, `<option value="%s">`, jar)
+		fmt.Fprintln(w, "")
+	}
+	fmt.Fprintln(w, `</datalist>`)
+	fmt.Fprintln(w, `<button id="get_fortune">Get Fortune</button>`)
+	fmt.Fprintln(w, `</form>`)
+
+	if fortune.Body != "" {
+		fmt.Fprintln(w, `<article class="fortune">`)
+		fmt.Fprintln(w, `<p>`)
+		fmt.Fprintf(w, `(%s)<br>`, fortune.Jar)
+		fmt.Fprintln(w, "")
+		fmt.Fprintf(w, `%s<br>`, fortune.Body)
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, `</p>`)
+
+		if qjarid == "" {
+			fmt.Fprintf(w, `<p><a href="/site?jar=%s&jarid=%s">permalink</a></p>`, fortune.Jar, fortune.ID)
+			fmt.Fprintln(w, "")
+		}
+		fmt.Fprintln(w, `</article>`)
+	} else {
+		fmt.Fprintln(w, `<p>No fortune exists.</p>`)
+	}
+
+	fmt.Fprintln(w, `<script>
+let jar_entry = document.querySelector("#jar");
+jar_entry.addEventListener("focus", function(e) {
+    jar_entry.select();
+});
+</script>`)
+	fmt.Fprintln(w, `</body>`)
+	fmt.Fprintln(w, `</html>`)
 }
