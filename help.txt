@@ -1,0 +1,55 @@
+FORTUNE2 QUICK HELP
+===================
+
+
+WEB SERVICE USAGE
+-----------------
+
+Get a random fortune in plain text format:
+/fortune/
+
+Get a random fortune in json format:
+/fortune/?outputfmt=json
+
+Get a random fortune in html format:
+/fortune/?outputfmt=html
+
+Get a random fortune from the 'news' jar in html format:
+/fortune/news?outputfmt=html
+
+Get fortune #3 from the 'news' jar in html format:
+/fortune/news/3?outputfmt=html
+
+Get a random fortune from any of the jars: 'news', 'perl', 'linux':
+/fortune/?jars=news,perl,linux
+
+Use sw=c option to display the jar which the fortune belongs to:
+/fortune/?sw=c
+
+List jar information:
+/info
+/info?outputfmt=json
+
+Note:
+- If outputfmt is not specified, it returns plain text.
+- Use outputfmt=htmlpre for html <pre> format.
+- Use sw=e to disregard jar size when selecting random jars.
+- Combine sw= options like this: sw=ce (uses both 'c' and 'e' option)
+
+
+WEBSITE USAGE
+-------------
+
+Get a random fortune:
+/fortuneweb/
+
+Get a random fortune from the 'perl' jar:
+/fortuneweb/?jar=perl
+
+Get fortune #12 from the 'perl' jar:
+/fortuneweb/?jar=perl&jarid=12
+
+
+Html version of this help page:
+/?outputfmt=html
+

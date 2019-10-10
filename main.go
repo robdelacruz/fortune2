@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	//	"html/template"
+	"html/template"
 	"io"
 	"log"
 	"math/rand"
@@ -137,7 +137,7 @@ func main() {
 		http.Handle("/asset/", http.StripPrefix("/asset/", http.FileServer(http.Dir("./asset"))))
 		http.HandleFunc("/info/", infoHandler(db))
 		http.HandleFunc("/fortune/", fortuneHandler(db))
-		http.HandleFunc("/site/", siteHandler(db))
+		http.HandleFunc("/fortuneweb/", fortunewebHandler(db))
 		http.HandleFunc("/", rootHandler(db))
 
 		fmt.Printf("Listening on %s...\n", port)
@@ -559,7 +559,7 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
-func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+func fortunewebHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var jar string
 		var jarid string
@@ -586,21 +586,24 @@ func siteHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		}
 
 		printFortunePage(w, fortune, allTables(db), jar, jarid)
-
-		//		t := template.Must(template.ParseFiles("fortune.html"))
-		//		t.Execute(w, &FortuneCtx{Fortune: fortune, Jars: allTables(db), Qjar: jar, Qjarid: jarid})
 	}
 }
 
 func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
+		// &outputfmt=json
+		r.ParseForm()
+		outputfmt := r.FormValue("outputfmt")
 
-		helptext := `Help
-----
-<put help text here>
-`
-		fmt.Fprintf(w, helptext)
+		if outputfmt == "html" {
+			w.Header().Set("Content-Type", "text/html")
+			t := template.Must(template.ParseFiles("help.html"))
+			t.Execute(w, nil)
+		} else {
+			w.Header().Set("Content-Type", "text/plain")
+			t := template.Must(template.ParseFiles("help.txt"))
+			t.Execute(w, nil)
+		}
 	}
 }
 

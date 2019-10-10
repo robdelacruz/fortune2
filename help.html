@@ -1,0 +1,63 @@
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fortune2 Quick Help</title>
+</head>
+<body>
+    <h1>Fortune2 Quick Help</h1>
+
+    <h2>Web Service Usage</h2>
+    <p>
+    Get a random fortune in plain text format:<br>
+    <a href="/fortune/">/fortune/</a><br>
+    <br>
+    Get a random fortune in json format:<br>
+    <a href="/fortune/?outputfmt=json">/fortune/?outputfmt=json</a><br>
+    <br>
+    Get a random fortune in html format:<br>
+    <a href="/fortune/?outputfmt=html">/fortune/?outputfmt=html</a><br>
+    <br>
+    Get a random fortune from the 'news' jar in html format:<br>
+    <a href="/fortune/news?outputfmt=html">/fortune/news?outputfmt=html</a><br>
+    <br>
+    Get fortune #3 from the 'news' jar in html format:<br>
+    <a href="/fortune/news/3?outputfmt=html">/fortune/news/3?outputfmt=html</a><br>
+    <br>
+    Get a random fortune from any of the jars: 'news', 'perl', 'linux':<br>
+    <a href="/fortune/?jars=news,perl,linux">/fortune/?jars=news,perl,linux</a><br>
+    <br>
+    Use sw=c option to display the jar which the fortune belongs to:<br>
+    <a href="/fortune/?sw=c">/fortune/?sw=c</a>/<br>
+    <br>
+    List jar information:<br>
+    <a href="/info">/info</a><br>
+    <a href="/info?outputfmt=json">/info?outputfmt=json</a><br>
+    </p>
+
+    <p>
+    Note:<br>
+    - If <em>outputfmt</em> is not specified, plain text is returned by default.<br>
+    - Use outputfmt=htmlpre for html &lt;pre&gt; format.<br>
+    - Use sw=e to disregard jar size when selecting random jars.<br>
+    - Combine sw= options like this: sw=ce (uses both 'c' and 'e' option)
+    </p>
+
+
+<h2>Website Usage</h2>
+    <p>
+    Get a random fortune:<br>
+    <a href="/fortuneweb/">/fortuneweb/</a><br>
+    <br>
+    Get a random fortune from the 'perl' jar:<br>
+    <a href="/fortuneweb/?jar=perl">/fortuneweb/?jar=perl</a><br>
+    <br>
+    Get fortune #12 from the 'perl' jar:<br>
+    <a href="/fortuneweb/?jar=perl&jarid=12">/fortuneweb/?jar=perl&jarid=12</a><br>
+    </p>
+
+    <p><a href="/">Plain text version</a> of this help page:</p>
+
+</body>
+</html>
+
