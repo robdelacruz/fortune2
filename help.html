@@ -5,9 +5,7 @@
 <title>Fortune2 Quick Help</title>
 </head>
 <body>
-    <h1>Fortune2 Quick Help</h1>
-
-    <h2>Web Service Usage</h2>
+    <h1>FORTUNE2 WEB API QUICK GUIDE</h1>
     <p>
     Get a random fortune in plain text format:<br>
     <a href="/fortune/">/fortune/</a><br>
@@ -18,13 +16,16 @@
     Get a random fortune in html format:<br>
     <a href="/fortune/?outputfmt=html">/fortune/?outputfmt=html</a><br>
     <br>
-    Get a random fortune from the 'news' jar in html format:<br>
-    <a href="/fortune/news?outputfmt=html">/fortune/news?outputfmt=html</a><br>
+    Get a random fortune from the <em>linux</em> jar:<br>
+    <a href="/fortune/linux/?outputfmt=html">/fortune/linux/?outputfmt=html</a><br>
     <br>
-    Get fortune #3 from the 'news' jar in html format:<br>
+    Get a random fortune from the <em>news</em> jar in html format:<br>
+    <a href="/fortune/news/?outputfmt=html">/fortune/news/?outputfmt=html</a><br>
+    <br>
+    Get fortune #3 from the <em>news</em> jar in html format:<br>
     <a href="/fortune/news/3?outputfmt=html">/fortune/news/3?outputfmt=html</a><br>
     <br>
-    Get a random fortune from any of the jars: 'news', 'perl', 'linux':<br>
+    Get a random fortune from any of the jars: <em>news, perl, linux</em>:<br>
     <a href="/fortune/?jars=news,perl,linux">/fortune/?jars=news,perl,linux</a><br>
     <br>
     Use sw=c option to display the jar which the fortune belongs to:<br>
@@ -44,20 +45,7 @@
     </p>
 
 
-<h2>Website Usage</h2>
-    <p>
-    Get a random fortune:<br>
-    <a href="/fortuneweb/">/fortuneweb/</a><br>
-    <br>
-    Get a random fortune from the 'perl' jar:<br>
-    <a href="/fortuneweb/?jar=perl">/fortuneweb/?jar=perl</a><br>
-    <br>
-    Get fortune #12 from the 'perl' jar:<br>
-    <a href="/fortuneweb/?jar=perl&jarid=12">/fortuneweb/?jar=perl&jarid=12</a><br>
-    </p>
-
-    <p><a href="/">Plain text version</a> of this help page:</p>
-
+    <p><a href="/help?outputfmt=text">Plain text version</a> of this page</p>
 </body>
 </html>
 

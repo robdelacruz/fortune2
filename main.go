@@ -136,8 +136,8 @@ func main() {
 		}
 		http.Handle("/asset/", http.StripPrefix("/asset/", http.FileServer(http.Dir("./asset"))))
 		http.HandleFunc("/info/", infoHandler(db))
+		http.HandleFunc("/help/", helpHandler(db))
 		http.HandleFunc("/fortune/", fortuneHandler(db))
-		http.HandleFunc("/fortuneweb/", fortunewebHandler(db))
 		http.HandleFunc("/", rootHandler(db))
 
 		fmt.Printf("Listening on %s...\n", port)
@@ -559,7 +559,7 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
-func fortunewebHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var jar string
 		var jarid string
@@ -589,24 +589,6 @@ func fortunewebHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
-func rootHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// &outputfmt=json
-		r.ParseForm()
-		outputfmt := r.FormValue("outputfmt")
-
-		if outputfmt == "html" {
-			w.Header().Set("Content-Type", "text/html")
-			t := template.Must(template.ParseFiles("help.html"))
-			t.Execute(w, nil)
-		} else {
-			w.Header().Set("Content-Type", "text/plain")
-			t := template.Must(template.ParseFiles("help.txt"))
-			t.Execute(w, nil)
-		}
-	}
-}
-
 func infoHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// ?jars=jar1,jar2,jar3
@@ -631,6 +613,25 @@ func infoHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
+func helpHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// &outputfmt=json
+		r.ParseForm()
+		outputfmt := r.FormValue("outputfmt")
+
+		contentType := "text/html"
+		helpFile := "help.html"
+		if outputfmt == "text" || outputfmt == "plaintext" {
+			contentType = "text/plain"
+			helpFile = "help.txt"
+		}
+
+		w.Header().Set("Content-Type", contentType)
+		t := template.Must(template.ParseFiles(helpFile))
+		t.Execute(w, nil)
+	}
+}
+
 func printFortunePage(w io.Writer, fortune Fortune, jars []string, qjar, qjarid string) {
 	fmt.Fprintln(w, `<!DOCTYPE HTML>
 <html>
@@ -639,10 +640,24 @@ func printFortunePage(w io.Writer, fortune Fortune, jars []string, qjar, qjarid 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fortune2 test page</title>
 <style>
-body { margin: 0 auto; width: 50% }
-.fortune { padding: 20px; border: 1px dotted; }
-#new_fortune { margin: 20px 0; }
-.fortune {margin: 1em 0;}
+body {
+	margin: 0 auto;
+	width: 50%
+}
+.fortune {
+	margin: 1em 0;
+	padding: 20px;
+	border: 1px dotted;
+}
+#new_fortune {
+	margin: 20px 0;
+}
+.links {
+	margin: 2em 0;
+}
+.links a {
+	margin: 0 0.5em;
+}
 </style>
 </head>
 <body>`)
@@ -676,13 +691,18 @@ body { margin: 0 auto; width: 50% }
 		fmt.Fprintln(w, `</p>`)
 
 		if qjarid == "" {
-			fmt.Fprintf(w, `<p><a href="/site?jar=%s&jarid=%s">permalink</a></p>`, fortune.Jar, fortune.ID)
+			fmt.Fprintf(w, `<p><a href="/?jar=%s&jarid=%s">permalink</a></p>`, fortune.Jar, fortune.ID)
 			fmt.Fprintln(w, "")
 		}
 		fmt.Fprintln(w, `</article>`)
 	} else {
-		fmt.Fprintln(w, `<p>No fortune exists.</p>`)
+		fmt.Fprintln(w, `<article class="fortune"><p>No fortune exists.</p></article>`)
 	}
+
+	fmt.Fprintln(w, `<div class="links">
+<a href="https://github.com/robdelacruz/fortune2">source</a>
+<a href="/help/">api guide</a>
+</div>`)
 
 	fmt.Fprintln(w, `<script>
 let jar_entry = document.querySelector("#jar");
