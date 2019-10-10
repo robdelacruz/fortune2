@@ -18,6 +18,7 @@ install: fortune2
 	chmod a+w $(SHAREDIR)
 	chmod a+w $(SHAREDIR)/fortune2.db
 	cp fortune2 $(BINDIR)
+	fortune2 ingest fortunes/*
 
 uninstall:
 	rm -rf $(SHAREDIR)

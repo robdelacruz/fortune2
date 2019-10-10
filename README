@@ -1,3 +1,129 @@
-fortune2 - Display fortune. Inspired by Unix fortune.
+fortune2 - Get fortune text. Inspired by Unix fortune.
 
+Includes:
+- Console app (fortune2) to display random fortune
+- Web Service for requesting fortunes
+
+Use for:
+- Retrieving fortunes
+- Add, delete, search fortunes (compatible with Unix fortune cookie files)
+- Web Service backend
+
+Dependencies:
+- Unix shell, Go, SQLite3
+
+License:
+  MIT
+
+Manual:
+
+Build and Install
+-----------------
+  $ make
+  $ sudo make install
+
+  This will build and install 'fortune2' to /usr/local/bin and fortune2.db to
+  /usr/local/share/fortune2.
+
+  To uninstall:
+  $ sudo make uninstall
+
+fortune2 uses a sqlite3 database to store and retrieve fortune text strings.
+
+Set the FORTUNE2FILE enironment variable to override the fortune2 db file.
+Ex: $ export FORTUNE2FILE=~/my_fortune.db
+
+By default, fortunes will be read from /usr/local/share/fortune2/fortune2.db
+
+
+Display fortune
+---------------
+Get a random fortune:
+  $ fortune2 
+
+Get a random fortune from any of the jars: 'computers', 'news', 'perl':
+  $ fortune2 computers news perl
+
+Get a random fortune, displaying jar name (-c):
+  $ fortune2 -c
+  $ fortune2 -c computers news perl
+
+Get a random fortune, consider all jars to be of equal size (-e) in terms of
+probability:
+ $ fortune2 -e
+ $ fortune2 -e computers news perl
+ 
+Display the list of jars to be searched, but don't display the fortune (-f):
+  $ fortune2 -f
+  $ fortune2 -f computers news perl
+
+Display db file and complete list of jars:
+  $ fortune2 info
+
+
+Web API
+-------
+Start the web service:
+  $ fortune2 serve
+  $ fortune2 serve 8001
+
+Optionally specify a port number (Ex. 8001) to start the web service.
+
+To view sample web api requests, start the web service and browse to:
+  http://localhost:8000/help/
+
+
+Fortune2 Website
+----------------
+Start the web service and browse to http://localhost:8000/ to access a
+webpage where you can display random fortunes.
+
+
+Ingest fortunes
+---------------
+  $ fortune2 ingest fortunes/computers
+  $ fortune2 ingest fortunes/cookie
+
+This will add all fortunes from the 'computers' and 'cookie' text files
+into the fortune2 database. Input files must be in the cookie jar format
+in which fortunes are delimited by a single line containing "%".
+
+The fortune jar name will be taken from the filename (Ex. 'computers',
+'cookie').
+
+On installation, all fortunes located in the fortunes/ directory will be
+available. You can also run 'sudo make install_fortunes' separately.
+
+
+Delete fortunes
+---------------
+  $ fortune2 delete computers cookie
+
+This will delete all fortunes belonging in the jars 'computers' and 'cookie'. 
+
+
+Search fortunes
+---------------
+  $ fortune2 search "bill gates" computers news
+  $ fortune2 -i search "microsoft" computers
+  $ fortune2 -i search "fortune"
+
+This returns all fortunes from 'computers' and 'news' jars containing
+"bill gates" case sensitive. Use the "-i" switch for case insensitive search.
+If list of jars is not specified, all the jars will be searched.
+
+
+Developer's Note:
+fortune is one of my favorite Unix programs (along with 'cal'). To me, it's a
+source of insight, humor, and inspiration. I added it to my .bashrc file to
+get a new fun quote every time I start a new prompt. This is my attempt to
+provide a modern makeover to it.
+
+fortune2 can be used in the console as a replacement for the original fortune,
+or as webservice backend for web apps. 
+
+
+Contact:
+  Twitter: @robdelacruz
+  Source: http://github.com/robdelacruz/fortune2
 
