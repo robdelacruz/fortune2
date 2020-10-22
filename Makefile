@@ -7,8 +7,8 @@ dep:
 	go get -u github.com/mattn/go-sqlite3
 	go get -u github.com/gorilla/feeds
 
-fortune2: main.go
-	go build -o fortune2 main.go
+fortune2: fortune2.go
+	go build -o fortune2 fortune2.go
 
 clean:
 	rm -rf fortune2
