@@ -4,6 +4,7 @@ BINDIR=/usr/local/bin
 all: fortune2
 
 dep:
+	go env -w GO111MODULE=auto
 	go get -u github.com/mattn/go-sqlite3
 	go get -u github.com/gorilla/feeds
 
