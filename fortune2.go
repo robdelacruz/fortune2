@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/feeds"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -475,8 +476,8 @@ func queryNumRows(db *sql.DB, jar string) int {
 func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// ?jars=jar1,jar2,jar3
-		// &w=ec
-		// &utputfmt=json
+		// &sw=ec
+		// &outputfmt=json
 		r.ParseForm()
 		outputfmt := r.FormValue("outputfmt")
 		options := map[string]string{}
@@ -499,6 +500,8 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 			contentType = "text/html"
 		case "json":
 			contentType = "application/json"
+		case "rss":
+			contentType = "application/rss+xml"
 		}
 		w.Header().Set("Content-Type", contentType)
 
@@ -550,6 +553,31 @@ func fortuneHandler(db *sql.DB) func(http.ResponseWriter, *http.Request) {
 		case "json":
 			b, _ := json.MarshalIndent(fortune, "", "\t")
 			w.Write(b)
+		case "rss":
+			now := time.Now()
+			f := feeds.Feed{
+				Title:       fmt.Sprintf("Fortune (%s)", fortune.Jar),
+				Link:        &feeds.Link{Href: fmt.Sprintf("http://fortune2.robdelacruz.com/fortune/?jars=%s&sw=%s", r.FormValue("jars"), r.FormValue("sw"))},
+				Description: "",
+				Author:      &feeds.Author{},
+				Created:     now,
+			}
+			item := feeds.Item{
+				Title:       fortune.Body,
+				Link:        &feeds.Link{Href: fmt.Sprintf("http://fortune2.robdelacruz.com/fortune/%s/%s?sw=%s", fortune.Jar, fortune.ID, r.FormValue("sw"))},
+				Description: "",
+				Author:      &feeds.Author{},
+				Created:     now,
+			}
+			f.Items = []*feeds.Item{
+				&item,
+			}
+			rss, err := f.ToRss()
+			if err != nil {
+				fmt.Printf("ToRss() error (%s)\n", err)
+				return
+			}
+			fmt.Fprintln(w, rss)
 		default:
 			if options["c"] != "" {
 				fmt.Fprintf(w, "(%s)\n", fortune.Jar)
